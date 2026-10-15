@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Archive,
-  Check,
   Download,
   HardDrive,
   Loader2,
@@ -12,7 +11,6 @@ import {
   RotateCcw,
   Search,
   Trash2,
-  X,
 } from 'lucide-react'
 import {
   Dialog,
@@ -33,6 +31,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { api, Backup, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 
 function formatBytes(size: number) {
   if (!Number.isFinite(size) || size < 0) return '—'
@@ -42,11 +41,11 @@ function formatBytes(size: number) {
 
 export function BackupsPageView() {
   const { database, branches } = useStudio()
+  const { notify } = useNotifications()
   const [backups, setBackups] = useState<Backup[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState('')
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [restoreOpen, setRestoreOpen] = useState(false)
@@ -71,10 +70,6 @@ export function BackupsPageView() {
 
   const filtered = useMemo(() => backups.filter(item => `${item.label} ${item.id}`.toLowerCase().includes(search.toLowerCase())), [backups, search])
   const totalBytes = backups.reduce((total, item) => total + (Number.isFinite(item.size_bytes) ? item.size_bytes : 0), 0)
-  const showToast = (message: string) => {
-    setToastMessage(message)
-    window.setTimeout(() => setToastMessage(current => current === message ? null : current), 4000)
-  }
   const dismissRestore = () => { setRestoreOpen(false); setTargetBackup(null); setConfirmation('') }
 
   const handleCreate = async (event: React.FormEvent) => {
@@ -85,8 +80,8 @@ export function BackupsPageView() {
       await api('/backups', { method: 'POST', body: { database, label: newBackupName.trim() } })
       await loadBackups()
       setCreateOpen(false); setNewBackupName('')
-      showToast(`Backup "${newBackupName.trim()}" created successfully.`)
-    } catch (reason) { setError(errorMessage(reason)) } finally { setBusy('') }
+      notify(`Backup "${newBackupName.trim()}" created`, 'success')
+    } catch (reason) { const message = errorMessage(reason); setError(message); notify(message, 'error') } finally { setBusy('') }
   }
 
   const handleRestore = async (event: React.FormEvent) => {
@@ -100,8 +95,9 @@ export function BackupsPageView() {
       })
       dismissRestore()
       await loadBackups()
-      showToast(result.cleanupWarning || `Backup restored into ${targetDatabase}. Clients must reconnect.`)
-    } catch (reason) { setError(errorMessage(reason)) } finally { setBusy('') }
+      if (result.cleanupWarning) notify(result.cleanupWarning, 'warning')
+      else notify(`Backup restored into ${targetDatabase}. Clients must reconnect.`, 'success')
+    } catch (reason) { const message = errorMessage(reason); setError(message); notify(message, 'error') } finally { setBusy('') }
   }
 
   return (
@@ -145,7 +141,7 @@ export function BackupsPageView() {
           <span>{loading ? 'Loading backups…' : `${backups.length} backups`}</span>
           <span className="text-border-strong">•</span>
           <span>Total storage: {loading ? '—' : formatBytes(totalBytes)}</span>
-          <Button variant="default" size="tiny" disabled={loading || !!busy} iconLeft={loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />} onClick={() => loadBackups().catch(reason => setError(errorMessage(reason)))}>Refresh</Button>
+          <Button variant="default" size="tiny" disabled={loading || !!busy} iconLeft={loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />} onClick={() => loadBackups().then(() => notify('Backups refreshed')).catch(reason => { const message = errorMessage(reason); setError(message); notify(message, 'error') })}>Refresh</Button>
         </div>
       </div>
 
@@ -244,12 +240,6 @@ export function BackupsPageView() {
         </DialogContent>
       </Dialog>
 
-      {/* Original success toast */}
-      {toastMessage && <div role="status" className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-lg border border-strong bg-surface-100 p-3.5 text-xs text-foreground shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-200 text-foreground border border-strong shrink-0"><Check className="h-3.5 w-3.5" /></div>
-        <div className="pr-2"><div className="font-semibold text-foreground">Success</div><div className="text-[11px] text-foreground-lighter mt-0.5">{toastMessage}</div></div>
-        <button type="button" onClick={() => setToastMessage(null)} className="text-foreground-lighter hover:text-foreground p-1 transition-colors" aria-label="Dismiss notification"><X className="h-3.5 w-3.5" /></button>
-      </div>}
     </div>
   )
 }

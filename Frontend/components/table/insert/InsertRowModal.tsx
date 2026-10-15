@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
-import { Alert } from '@/components/ui/alert'
 
 interface InsertRowModalProps {
   open: boolean
@@ -34,7 +33,6 @@ export function InsertRowModal({
 }: InsertRowModalProps) {
   const [createMore, setCreateMore] = useState(false)
   const [nullFields, setNullFields] = useState<Record<string, boolean>>({})
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const firstInputRef = useRef<HTMLInputElement>(null)
 
   // Focus first editable input on open
@@ -106,17 +104,6 @@ export function InsertRowModal({
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           </div>
-
-          {/* Toast notification positioned bottom-right */}
-          {toastMessage && (
-            <Alert
-              position="bottom-right"
-              variant="success"
-              onClose={() => setToastMessage(null)}
-            >
-              {toastMessage}
-            </Alert>
-          )}
 
           {/* Scrollable Form Body */}
           <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-default">

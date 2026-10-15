@@ -41,17 +41,17 @@ export function Alert({
 
   const positionClasses = {
     'bottom-right':
-      'fixed bottom-5 right-5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200',
+      'fixed bottom-5 right-5 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-200',
     'bottom-left':
-      'fixed bottom-5 left-5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200',
+      'fixed bottom-5 left-5 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-200',
     'top-right':
-      'fixed top-5 right-5 z-50 animate-in fade-in slide-in-from-top-2 duration-200',
+      'fixed top-5 right-5 z-[100] animate-in fade-in slide-in-from-top-2 duration-200',
     'top-left':
-      'fixed top-5 left-5 z-50 animate-in fade-in slide-in-from-top-2 duration-200',
+      'fixed top-5 left-5 z-[100] animate-in fade-in slide-in-from-top-2 duration-200',
     'top-center':
-      'fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-2 duration-200',
+      'fixed top-5 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200',
     'bottom-center':
-      'fixed bottom-5 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200',
+      'fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-200',
     inline: 'relative w-full',
   }[position]
 
@@ -79,7 +79,7 @@ export function Alert({
           type="button"
           onClick={onClose}
           className="p-0.5 rounded text-foreground-lighter hover:text-foreground hover:bg-surface-200 transition-colors ml-1 cursor-pointer"
-          aria-label="Close alert"
+          aria-label="Dismiss notification"
         >
           <X className="h-3 w-3" />
         </button>

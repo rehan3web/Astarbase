@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert } from '@/components/ui/alert'
 
 interface InsertTableModalProps {
   open: boolean
@@ -59,7 +58,6 @@ export function InsertTableModal({
       isNullable: false,
     },
   ])
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -186,17 +184,6 @@ export function InsertTableModal({
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           </div>
-
-          {/* Toast Notification positioned bottom-right */}
-          {toastMessage && (
-            <Alert
-              position="bottom-right"
-              variant="success"
-              onClose={() => setToastMessage(null)}
-            >
-              {toastMessage}
-            </Alert>
-          )}
 
           {/* Scrollable Form Body matching InsertColumnModal layout */}
           <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-default">

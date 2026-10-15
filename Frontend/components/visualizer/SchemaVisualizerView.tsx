@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -34,7 +34,7 @@ import {
   Table2 as TableIcon,
 } from 'lucide-react'
 import { SchemaSelector } from '@/components/ui/schema-selector'
-import { Alert } from '@/components/ui/alert'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -276,31 +276,35 @@ function generateSchemaSvg(nodes: FlowTableNode[], edges: Edge[], isDark: boolea
 
 function SchemaVisualizerInner() {
   const { database } = useStudio()
+  const { notify } = useNotifications()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const { fitView } = useReactFlow()
   const [diagram, setDiagram] = useState<Diagram | null>(null)
   const [selectedSchema, setSelectedSchema] = useState('public')
   const [searchQuery, setSearchQuery] = useState('')
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [errorMessageText, setErrorMessageText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const loadSchema = useCallback(async (signal?: AbortSignal) => {
+  const loadSchema = useCallback(async (signal?: AbortSignal, announce = false) => {
     setIsLoading(true); setErrorMessageText('')
     try {
       const liveDiagram = await api<Diagram>(`/databases/${encodeURIComponent(database)}/schema`, { signal })
       if (!signal?.aborted) {
         setDiagram(liveDiagram)
         setSelectedSchema(current => liveDiagram.nodes.some(table => table.schema === current) ? current : liveDiagram.nodes[0]?.schema ?? 'public')
+        if (announce) notify('Schema refreshed')
       }
     } catch (error) {
-      if (!signal?.aborted) setErrorMessageText(errorMessage(error))
+      if (!signal?.aborted) {
+        const message = errorMessage(error)
+        setErrorMessageText(message)
+        if (announce) notify(message, 'error')
+      }
     } finally {
       if (!signal?.aborted) setIsLoading(false)
     }
-  }, [database])
+  }, [database, notify])
   useEffect(() => {
     const controller = new AbortController()
     void loadSchema(controller.signal)
@@ -348,18 +352,13 @@ function SchemaVisualizerInner() {
     }))
   }, [searchQuery, setNodes])
 
-  const showToast = useCallback((message: string) => {
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
-    setToastMessage(message)
-    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 2500)
-  }, [])
-
   const handleAutoLayout = useCallback(() => {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges)
     setNodes([...layoutedNodes])
     setEdges([...layoutedEdges])
     window.setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 50)
-  }, [nodes, edges, fitView, setNodes, setEdges])
+    notify('Schema layout arranged')
+  }, [nodes, edges, fitView, setNodes, setEdges, notify])
 
   const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
@@ -374,17 +373,17 @@ function SchemaVisualizerInner() {
     if (!liveDiagram) return
     try {
       await navigator.clipboard.writeText(generateSql(schemaTables, schemaEdges, selectedSchema))
-      showToast('Copied SQL schema to clipboard!')
-    } catch (error) { setErrorMessageText(errorMessage(error)) }
-  }, [liveDiagram, schemaTables, schemaEdges, selectedSchema, showToast])
+      notify('Copied SQL schema to clipboard!')
+    } catch (error) { const message = errorMessage(error); setErrorMessageText(message); notify(message, 'error') }
+  }, [liveDiagram, schemaTables, schemaEdges, selectedSchema, notify])
 
   const handleCopyAsMarkdown = useCallback(async () => {
     if (!liveDiagram) return
     try {
       await navigator.clipboard.writeText(generateMarkdown(schemaTables, schemaEdges, selectedSchema))
-      showToast('Copied Markdown schema to clipboard!')
-    } catch (error) { setErrorMessageText(errorMessage(error)) }
-  }, [liveDiagram, schemaTables, schemaEdges, selectedSchema, showToast])
+      notify('Copied Markdown schema to clipboard!')
+    } catch (error) { const message = errorMessage(error); setErrorMessageText(message); notify(message, 'error') }
+  }, [liveDiagram, schemaTables, schemaEdges, selectedSchema, notify])
 
   const handleDownloadPng = useCallback(() => {
     try {
@@ -401,14 +400,14 @@ function SchemaVisualizerInner() {
           const anchor = document.createElement('a')
           anchor.href = canvas.toDataURL('image/png'); anchor.download = `${selectedSchema}-schema.png`
           document.body.appendChild(anchor); anchor.click(); document.body.removeChild(anchor)
-          showToast('Downloaded schema as PNG')
-        }
+          notify('Downloaded schema as PNG')
+        } else { setErrorMessageText('Could not render the schema diagram as PNG.'); notify('Could not render the schema diagram as PNG.', 'error') }
         URL.revokeObjectURL(url)
       }
-      image.onerror = () => { URL.revokeObjectURL(url); setErrorMessageText('Could not render the schema diagram as PNG.') }
+      image.onerror = () => { URL.revokeObjectURL(url); setErrorMessageText('Could not render the schema diagram as PNG.'); notify('Could not render the schema diagram as PNG.', 'error') }
       image.src = url
-    } catch (error) { setErrorMessageText(errorMessage(error)) }
-  }, [nodes, edges, isDark, selectedSchema, showToast])
+    } catch (error) { const message = errorMessage(error); setErrorMessageText(message); notify(message, 'error') }
+  }, [nodes, edges, isDark, selectedSchema, notify])
 
   const handleDownloadSvg = useCallback(() => {
     try {
@@ -418,13 +417,12 @@ function SchemaVisualizerInner() {
       anchor.href = url; anchor.download = `${selectedSchema}-schema.svg`
       document.body.appendChild(anchor); anchor.click(); document.body.removeChild(anchor)
       URL.revokeObjectURL(url)
-      showToast('Downloaded schema as SVG')
-    } catch (error) { setErrorMessageText(errorMessage(error)) }
-  }, [nodes, edges, isDark, selectedSchema, showToast])
+      notify('Downloaded schema as SVG')
+    } catch (error) { const message = errorMessage(error); setErrorMessageText(message); notify(message, 'error') }
+  }, [nodes, edges, isDark, selectedSchema, notify])
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-studio relative">
-      {toastMessage && <Alert position="bottom-right" variant="success" onClose={() => setToastMessage(null)}>{toastMessage}</Alert>}
 
       {/* Original top toolbar: schema selector, search, split SQL/export control, auto layout */}
       <div className="h-11 shrink-0 border-b border-default bg-dash-sidebar flex items-center justify-between px-4 z-10 select-none">
@@ -455,7 +453,7 @@ function SchemaVisualizerInner() {
         </div>
       </div>
 
-      {errorMessageText && <div role="alert" className="flex items-center justify-between border-b border-default p-3 text-xs text-red-400">{errorMessageText}<button type="button" onClick={() => void loadSchema()} className="underline">Retry</button></div>}
+      {errorMessageText && <div role="alert" className="flex items-center justify-between border-b border-default p-3 text-xs text-red-400">{errorMessageText}<button type="button" onClick={() => void loadSchema(undefined, true)} className="underline">Retry</button></div>}
       {isLoading && <div className="absolute top-14 left-4 z-10 rounded-md border border-default bg-surface-100/90 px-3 py-2 text-xs text-foreground-lighter">Loading live schema…</div>}
       {!isLoading && !errorMessageText && !nodes.length && <div className="absolute inset-0 top-11 z-10 grid place-items-center pointer-events-none"><div className="rounded-lg border border-default bg-surface-100/90 p-6 text-center text-sm text-foreground-lighter">{schemas.length ? 'No tables in this schema.' : 'No database tables found.'}<br /><span className="text-xs">Create tables in the Table Editor or run DDL in SQL Editor.</span></div></div>}
 

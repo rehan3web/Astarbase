@@ -5,6 +5,7 @@ import { api, errorMessage, qi, literal, tablePath, TableRows, SqlResponse } fro
 import { liveTable, createTableSql } from '@/lib/live-tables'
 import type { TableDefinition } from '@/lib/mock-data'
 import { useStudio } from '@/components/providers/StudioProvider'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 import { TableExplorer, TableAction } from './explorer/TableExplorer'
 import { TableToolbar } from './editor/TableToolbar'
 import { TableDataGrid, ColumnAction } from './editor/TableDataGrid'
@@ -28,6 +29,7 @@ const blankColumn: ColumnValues = { name: '', type: 'text', defaultValue: '', is
 export function TableEditorView() {
   const router = useRouter()
   const { database, settings } = useStudio()
+  const { notify } = useNotifications()
   const [tables, setTables] = useState<Summary[]>([])
   const [schema, setSchema] = useState('public')
   const [selected, setSelected] = useState<Summary | null>(null)
@@ -39,7 +41,6 @@ export function TableEditorView() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [sortColumn, setSortColumn] = useState('')
   const [direction, setDirection] = useState<'asc' | 'desc'>('asc')
@@ -74,20 +75,21 @@ export function TableEditorView() {
   useEffect(() => {
     const controller = new AbortController()
     version.current++
-    setSelected(null); setData(null); setOffset(0); setError(''); setNotice(''); setTables([]); setFrozenColumns(new Set())
+    setSelected(null); setData(null); setOffset(0); setError(''); setTables([]); setFrozenColumns(new Set())
     loadTables(controller.signal).then(list => { if (!controller.signal.aborted && list[0]) { setSelected(list[0]); setSchema(list[0].schema); const id = JSON.stringify([list[0].schema, list[0].name]); setOpenTabs([id]); setActiveTab(id); setRecentItems([{ tableId: id, openedAt: Date.now() }]) } })
       .catch(e => { if (!controller.signal.aborted) setError(errorMessage(e)) })
     return () => controller.abort()
   }, [loadTables])
   const loadRows = useCallback(async (signal?: AbortSignal) => {
-    if (!selected) return
+    if (!selected) return false
     const current = ++version.current
     setLoading(true); setError(''); setData(null); setSelectedRows(new Set())
     try {
       const result = await api<TableRows>(`${tablePath(database, selected.schema, selected.name)}?limit=${limit}&offset=${offset}`, { signal })
-      if (current === version.current && !signal?.aborted) setData(result)
+      if (current === version.current && !signal?.aborted) { setData(result); return true }
     } catch (e) { if (current === version.current && !signal?.aborted) setError(errorMessage(e)) }
     finally { if (current === version.current && !signal?.aborted) setLoading(false) }
+    return false
   }, [database, selected, offset, limit])
   useEffect(() => { const controller = new AbortController(); void loadRows(controller.signal); return () => controller.abort() }, [loadRows])
   const rows = useMemo(() => {
@@ -101,9 +103,9 @@ export function TableEditorView() {
   }
   async function mutate(fn: () => Promise<unknown>, message: string) {
     if (busy) return false
-    setBusy(true); setError(''); setNotice('')
-    try { await fn(); setNotice(message); return true }
-    catch (e) { setError(errorMessage(e)); return false }
+    setBusy(true); setError('')
+    try { await fn(); notify(message, 'success'); return true }
+    catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error'); return false }
     finally { setBusy(false) }
   }
   async function sql(query: string) {
@@ -152,19 +154,32 @@ export function TableEditorView() {
     const selected = pickedRows
     let content = kind === 'csv' ? csv(selected) : JSON.stringify(selected, null, 2)
     if (kind === 'sql') content = selected.map(row => `INSERT INTO ${qi(data.schema)}.${qi(data.name)} (${data.columns.map(c => qi(c.name)).join(', ')}) VALUES (${data.columns.map(c => row[c.name] === null || row[c.name] === undefined ? 'NULL' : typeof row[c.name] === 'number' || typeof row[c.name] === 'boolean' ? String(row[c.name]) : literal(String(row[c.name]))).join(', ')});`).join('\n')
-    try { await navigator.clipboard.writeText(content); setNotice(`Copied ${selected.length} selected row${selected.length === 1 ? '' : 's'} as ${kind.toUpperCase()}.`) } catch (e) { setError(errorMessage(e)) }
+    try { await navigator.clipboard.writeText(content); notify(`Copied ${selected.length} selected row${selected.length === 1 ? '' : 's'} as ${kind.toUpperCase()}.`) } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') }
   }
-  async function refresh() { await loadTables(); await loadRows() }
+  async function refresh(announce = false) {
+    try {
+      await loadTables()
+      const rowsLoaded = await loadRows()
+      if (!rowsLoaded) throw new Error('Table rows could not be refreshed')
+      if (announce) notify('Tables refreshed')
+    }
+    catch (e) {
+      const message = errorMessage(e)
+      setError(message)
+      if (announce) notify(message, 'error')
+      else throw e
+    }
+  }
   async function cell(rowIdx: number, column: string, value: unknown) {
     if (!data) return
     let parsed = value
     const col = data.columns.find(c => c.name === column)
     try { if (col && ['json', 'jsonb'].includes(col.udt_name) && typeof value === 'string') parsed = JSON.parse(value) }
-    catch { setError('Enter valid JSON for this column'); return }
+    catch { setError('Enter valid JSON for this column'); notify('Enter valid JSON for this column', 'error'); return }
     await mutate(async () => {
       await api(tablePath(database, data.schema, data.name), { method: 'PATCH', body: { key: key(rows[rowIdx]), changes: { [column]: parsed } } })
       await loadRows()
-    }, 'Row saved to Postgres')
+      }, 'Row updated')
   }
   async function removeRows() {
     if (!data || !selectedRows.size) return
@@ -174,11 +189,14 @@ export function TableEditorView() {
     }, 'Selected rows deleted')
   }
   async function tableAction(target: TableDefinition, action: TableAction) {
-    if (action === 'copy-name') { await navigator.clipboard.writeText(target.name); return }
+    if (action === 'copy-name') { try { await navigator.clipboard.writeText(target.name); notify(`Copied table name ${target.name}`) } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') }; return }
     if (action === 'delete') { setDeleteTable(target); return }
     if (action === 'copy-schema') {
-      if (table?.schema === target.schema && table.name === target.name) { await navigator.clipboard.writeText(createTableSql(table)); setNotice(`Copied live DDL for ${target.name}.`); return }
-      try { const detail = await api<TableRows>(`${tablePath(database, target.schema, target.name)}?limit=1&offset=0`); await navigator.clipboard.writeText(createTableSql(liveTable(detail))); setNotice(`Copied live DDL for ${target.name}.`) } catch (e) { setError(errorMessage(e)) }
+      try {
+        const detail = table?.schema === target.schema && table.name === target.name ? data! : await api<TableRows>(`${tablePath(database, target.schema, target.name)}?limit=1&offset=0`)
+        await navigator.clipboard.writeText(createTableSql(liveTable(detail)))
+        notify(`Copied live DDL for ${target.name}.`)
+      } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') }
       return
     }
     if (action === 'export-csv' || action === 'export-json' || action === 'export-sql') {
@@ -189,8 +207,8 @@ export function TableEditorView() {
           ? [detail.columns.map(c => `"${c.name}"`).join(','), ...detail.rows.map(row => detail.columns.map(c => `"${String(row[c.name] ?? '').replaceAll('"', '""')}"`).join(','))].join('\n')
           : action === 'export-json' ? JSON.stringify(detail.rows, null, 2) : `${createTableSql(live)}\n\n${detail.rows.map(row => `INSERT INTO ${qi(target.schema)}.${qi(target.name)} (${detail.columns.map(c => qi(c.name)).join(', ')}) VALUES (${detail.columns.map(c => row[c.name] === null ? 'NULL' : typeof row[c.name] === 'number' || typeof row[c.name] === 'boolean' ? String(row[c.name]) : literal(String(row[c.name]))).join(', ')});`).join('\n')}`
         download(content, `${target.name}.${action === 'export-csv' ? 'csv' : action === 'export-json' ? 'json' : 'sql'}`, action === 'export-csv' ? 'text/csv' : action === 'export-json' ? 'application/json' : 'application/sql')
-        setNotice(`Exported the loaded ${detail.rows.length} row${detail.rows.length === 1 ? '' : 's'} from ${target.name}.`)
-      } catch (e) { setError(errorMessage(e)) }
+        notify(`Exported ${target.name} as ${action.slice(7).toUpperCase()}.`)
+      } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') }
       return
     }
     if (action === 'edit') { setEditTable(target); return }
@@ -209,7 +227,7 @@ export function TableEditorView() {
   }
   async function columnAction(column: NonNullable<typeof table>['columns'][number], action: ColumnAction) {
     if (action === 'sort-asc' || action === 'sort-desc') { setSortColumn(column.name); setDirection(action === 'sort-asc' ? 'asc' : 'desc'); setSelectedRows(new Set()); return }
-    if (action === 'copy-name') { await navigator.clipboard.writeText(column.name); return }
+    if (action === 'copy-name') { try { await navigator.clipboard.writeText(column.name); notify(`Copied column name ${column.name}`) } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') }; return }
     if (action === 'toggle-freeze') {
       setFrozenColumns(prev => { const next = new Set(prev); next.has(column.id) ? next.delete(column.id) : next.add(column.id); return next })
       return
@@ -226,10 +244,9 @@ export function TableEditorView() {
     <section className="flex flex-col min-w-0 flex-1 overflow-hidden">
       <TableTabBar openTabIds={openTabs} activeTabId={activeTab} getTable={lookupTable} isSidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(v => !v)} onSelectTab={activateTab} onCloseTab={closeTab} onNewTab={newTab} onTableAction={(target, action) => void tableAction(target, action as TableAction)} />
       {activeTab === NEW_TAB_ID || !selected ? <TableNewTabView recentItems={recentItems} getTable={lookupTable} onCreateTable={() => setInsertTable(true)} onOpenTable={openTable} /> : table ? <>
-        <TableToolbar selectedTable={table} selectedRowIds={selectedRows} filterSearch={filter} onFilterSearchChange={v => { setFilter(v); setSelectedRows(new Set()) }} sortColumn={sortColumn} onSortColumnChange={setSortColumn} sortDirection={direction} onSortDirectionChange={setDirection} onCopyCsv={() => void copySelected('csv')} onCopyJson={() => void copySelected('json')} onCopySql={() => void copySelected('sql')} onExportCsv={() => download(csv(pickedRows), `${table.name}_selected.csv`, 'text/csv')} onExportJson={() => download(JSON.stringify(pickedRows, null, 2), `${table.name}_selected.json`, 'application/json')} onDeleteSelected={() => setDeleteRowsOpen(true)} onAddRlsPolicy={() => router.push('/policies')} onRefresh={() => void refresh().catch(e => setError(errorMessage(e)))} onInsertRow={() => setInsertRow(true)} onInsertColumn={() => { setEditingColumn(null); setColumnValues(blankColumn); setInsertColumn(true) }} />
+        <TableToolbar selectedTable={table} selectedRowIds={selectedRows} filterSearch={filter} onFilterSearchChange={v => { setFilter(v); setSelectedRows(new Set()) }} sortColumn={sortColumn} onSortColumnChange={setSortColumn} sortDirection={direction} onSortDirectionChange={setDirection} onCopyCsv={() => void copySelected('csv')} onCopyJson={() => void copySelected('json')} onCopySql={() => void copySelected('sql')} onExportCsv={() => { try { download(csv(pickedRows), `${table.name}_selected.csv`, 'text/csv'); notify('Selected rows exported as CSV') } catch (e) { notify(errorMessage(e), 'error') } }} onExportJson={() => { try { download(JSON.stringify(pickedRows, null, 2), `${table.name}_selected.json`, 'application/json'); notify('Selected rows exported as JSON') } catch (e) { notify(errorMessage(e), 'error') } }} onDeleteSelected={() => setDeleteRowsOpen(true)} onAddRlsPolicy={() => router.push('/policies')} onRefresh={() => void refresh(true)} onInsertRow={() => setInsertRow(true)} onInsertColumn={() => { setEditingColumn(null); setColumnValues(blankColumn); setInsertColumn(true) }} />
         {busy && <div className="px-4 py-1 text-[11px] text-foreground-lighter border-b border-default">Writing changes to Postgres…</div>}
         {error && <div role="alert" className="px-4 py-2 text-xs text-red-400 border-b border-default">{error}</div>}
-        {notice && <div role="status" className="px-4 py-1.5 text-xs text-brand-500 border-b border-default">{notice}</div>}
         {loading ? <div className="p-5 space-y-2">{[0,1,2,3,4].map(i => <div key={i} className="h-8 rounded bg-surface-200/60 animate-pulse" />)}</div> : <>
           {!data?.editable && <p className="px-4 py-2 text-xs text-amber-500 border-b border-default">This table has no primary key; safe row edit and delete are unavailable. Inserts remain enabled.</p>}
           <div className="flex-1 min-h-0 overflow-auto">{definition ? <TableDefinitionView selectedTable={table} /> : <TableDataGrid selectedTable={table} displayedRows={rows} selectedRowIds={selectedRows} onToggleSelectAll={() => setSelectedRows(selectedRows.size === rows.length ? new Set() : new Set(rows.map((_, i) => String(i))))} onToggleSelectRow={idx => setSelectedRows(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next })} onInsertColumn={() => setInsertColumn(true)} sortColumn={sortColumn} sortDirection={direction} frozenColumnIds={frozenColumns} onColumnAction={columnAction} onUpdateCell={data?.editable && !busy ? cell : undefined} hideFooter />}</div>
@@ -264,6 +281,7 @@ export function TableEditorView() {
         const type = c.type + (c.isArray && !c.type.endsWith('[]') ? '[]' : '')
         if (editingColumn && !!c.isPrimaryKey !== !!data?.primaryKey.includes(editingColumn)) {
           setError('Use the SQL editor to change existing primary-key constraints. No changes were made.')
+          notify('Changing an existing primary-key constraint is not supported here', 'error')
           return
         }
         let statement = `ALTER TABLE ${name} ADD COLUMN ${target} ${type}${c.isNullable ? '' : ' NOT NULL'}${c.defaultValue ? ` DEFAULT ${c.defaultValue}` : ''}${c.isPrimaryKey ? ' PRIMARY KEY' : ''};`
@@ -272,7 +290,7 @@ export function TableEditorView() {
           statement += `ALTER TABLE ${name} ALTER COLUMN ${target} TYPE ${type} USING ${target}::${type}; ALTER TABLE ${name} ALTER COLUMN ${target} ${c.isNullable ? 'DROP' : 'SET'} NOT NULL; ALTER TABLE ${name} ALTER COLUMN ${target} ${c.defaultValue ? `SET DEFAULT ${c.defaultValue}` : 'DROP DEFAULT'};`
         }
         if (c.description !== undefined) statement += `COMMENT ON COLUMN ${name}.${target} IS ${literal(c.description)};`
-        const ok = await mutate(async () => { await sql(`BEGIN; ${statement} COMMIT;`); await refresh() }, 'Column saved')
+        const ok = await mutate(async () => { await sql(`BEGIN; ${statement} COMMIT;`); await refresh() }, editingColumn ? 'Column updated' : 'Column created')
         if (ok) { setColumnValues(blankColumn); if (!keepOpen) setInsertColumn(false) }
       }} />
     </>}
@@ -282,7 +300,7 @@ export function TableEditorView() {
         setOpenTabs(prev => prev.filter(id => id !== target.id)); setRecentItems(prev => prev.filter(item => item.tableId !== target.id))
         if (selected?.schema === target.schema && selected.name === target.name) { setSelected(null); setData(null); setActiveTab(NEW_TAB_ID) }
         await loadTables()
-      }, `Table ${target.name} deleted`)
+      }, 'Table deleted')
       if (ok) setDeleteTable(null)
     }} />
     <DeleteRowsModal open={deleteRowsOpen} onOpenChange={setDeleteRowsOpen} rowCount={selectedRows.size} onConfirm={removeRows} />
@@ -310,7 +328,7 @@ export function TableEditorView() {
           const renamed = next.find(item => item.schema === target.schema && item.name === nextName)
           if (renamed) { setSelected(renamed); setData(null); const previousId = target.id; const nextId = JSON.stringify([renamed.schema, renamed.name]); setOpenTabs(tabs => tabs.map(id => id === previousId ? nextId : id)); setActiveTab(nextId) }
         }
-      }, `Table ${nextName} updated`)
+      }, 'Table updated')
     }} />
   </div>
 }

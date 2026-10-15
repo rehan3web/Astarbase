@@ -3,7 +3,6 @@
 import React, { useState } from 'react'
 import {
   AlertTriangle,
-  Check,
   GitBranch,
   HardDrive,
   Loader2,
@@ -12,7 +11,6 @@ import {
   Plus,
   RotateCcw,
   Trash2,
-  X,
 } from 'lucide-react'
 import {
   Dialog,
@@ -33,9 +31,11 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 
 export function BranchesPageView() {
   const { branches, branch: activeBranch, selectBranch, reload } = useStudio()
+  const { notify } = useNotifications()
   const [createOpen, setCreateOpen] = useState(false)
   const [refreshOpen, setRefreshOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -45,11 +45,6 @@ export function BranchesPageView() {
   const [confirmation, setConfirmation] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const showToast = (message: string) => {
-    setToastMessage(message)
-    window.setTimeout(() => setToastMessage(current => current === message ? null : current), 4000)
-  }
 
   const closeConfirmation = () => {
     setRefreshOpen(false)
@@ -69,8 +64,8 @@ export function BranchesPageView() {
       await api('/branches', { method: 'POST', body: { name, parent: parent.name } })
       await reload()
       setCreateOpen(false); setNewBranchName('')
-      showToast(`Branch "${name}" created successfully`)
-    } catch (e) { setError(errorMessage(e)) } finally { setBusy(false) }
+      notify(`Branch "${name}" created`, 'success')
+    } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
   }
 
   const handleRefresh = async (event: React.FormEvent) => {
@@ -84,8 +79,9 @@ export function BranchesPageView() {
       })
       await reload()
       closeConfirmation()
-      showToast(result.cleanupWarning || `Branch "${targetBranch.name}" refreshed from its parent. Clients must reconnect.`)
-    } catch (e) { setError(errorMessage(e)) } finally { setBusy(false) }
+      if (result.cleanupWarning) notify(result.cleanupWarning, 'warning')
+      else notify(`Branch "${targetBranch.name}" refreshed from its parent. Clients must reconnect.`, 'success')
+    } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
   }
 
   const handleDelete = async (event: React.FormEvent) => {
@@ -99,8 +95,8 @@ export function BranchesPageView() {
       })
       await reload()
       closeConfirmation()
-      showToast(`Branch "${targetBranch.name}" deleted successfully.`)
-    } catch (e) { setError(errorMessage(e)) } finally { setBusy(false) }
+      notify(`Branch "${targetBranch.name}" deleted`, 'success')
+    } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
   }
 
   return (
@@ -259,12 +255,6 @@ export function BranchesPageView() {
         </DialogContent>
       </Dialog>
 
-      {/* Original success toast */}
-      {toastMessage && <div role="status" className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-lg border border-strong bg-surface-100 p-3.5 text-xs text-foreground shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-200 text-foreground border border-strong shrink-0"><Check className="h-3.5 w-3.5" /></div>
-        <div className="pr-2"><div className="font-semibold text-foreground">Success</div><div className="text-[11px] text-foreground-lighter mt-0.5">{toastMessage}</div></div>
-        <button type="button" onClick={() => setToastMessage(null)} className="text-foreground-lighter hover:text-foreground p-1 transition-colors" aria-label="Dismiss notification"><X className="h-3.5 w-3.5" /></button>
-      </div>}
     </div>
   )
 }

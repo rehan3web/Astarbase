@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import { GitBranch, Search, Plus, Check, ChevronsUpDown, Loader2, X } from 'lucide-react'
+import { GitBranch, Search, Plus, Check, ChevronsUpDown, Loader2 } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 
 type BranchTag = 'default' | 'branch'
 function getTag(branch: { parent_name: string | null }): BranchTag { return branch.parent_name ? 'branch' : 'default' }
@@ -16,19 +17,18 @@ function getTagBadgeStyle(tag: BranchTag) {
 
 export function BranchSwitcher() {
   const { branches, branch: activeBranch, database, selectBranch, reload } = useStudio()
+  const { notify } = useNotifications()
   const [search, setSearch] = useState('')
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newBranchName, setNewBranchName] = useState('')
   const [parentDatabase, setParentDatabase] = useState(database)
   const [isCreating, setIsCreating] = useState(false)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [toastError, setToastError] = useState(false)
   const filteredBranches = useMemo(() => branches.filter(item => `${item.name} ${item.database_name}`.toLowerCase().includes(search.toLowerCase())), [branches, search])
   async function handleCreateBranch(event: React.FormEvent) {
     event.preventDefault()
     if (!newBranchName.trim() || isCreating) return
-    setIsCreating(true); setToastMessage(null); setToastError(false)
+    setIsCreating(true)
     try {
       const name = newBranchName.trim()
       const parent = branches.find(branch => branch.database_name === parentDatabase)
@@ -37,9 +37,9 @@ export function BranchSwitcher() {
       await reload()
       selectBranch(name)
       setDialogOpen(false); setNewBranchName('')
-      setToastMessage(`Branch "${name}" created successfully.`)
-    } catch (e) { setToastMessage(errorMessage(e)); setToastError(true) }
-    finally { setIsCreating(false); window.setTimeout(() => setToastMessage(null), 4000) }
+      notify(`Branch "${name}" created`, 'success')
+    } catch (e) { notify(errorMessage(e), 'error') }
+    finally { setIsCreating(false) }
   }
   return (
     <>
@@ -90,7 +90,6 @@ export function BranchSwitcher() {
               <div className="space-y-1.5"><label className="text-xs font-medium text-foreground">Branch name <span className="text-destructive">*</span></label><Input aria-label="New branch name" placeholder="e.g. staging, feature_auth" value={newBranchName} onChange={e => setNewBranchName(e.target.value)} pattern="[a-z][a-z0-9_]{0,47}" maxLength={48} disabled={isCreating} required autoFocus className="bg-surface-200 border-strong text-foreground placeholder:text-foreground-muted text-xs h-9 focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" /></div>
               <div className="space-y-1.5"><label className="text-xs font-medium text-foreground">Parent database</label><select aria-label="Parent database" value={parentDatabase} onChange={e => setParentDatabase(e.target.value)} disabled={isCreating} className="w-full bg-surface-200 border border-strong rounded-md text-xs h-9 px-2.5 text-foreground outline-none focus:ring-1 focus:ring-strong cursor-pointer">{branches.map(item => <option key={item.name} value={item.database_name}>{item.name} · {item.database_name}</option>)}</select></div>
             </div>
-            {toastError && toastMessage && <p role="alert" className="mb-3 text-xs text-destructive">{toastMessage}</p>}
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">
               <button type="button" onClick={() => setDialogOpen(false)} disabled={isCreating} className="px-3 py-1.5 text-xs font-medium text-foreground-lighter hover:text-foreground hover:bg-surface-200 rounded-md transition-colors">Cancel</button>
               <button type="submit" disabled={!newBranchName.trim() || isCreating} className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-foreground bg-surface-300 hover:bg-surface-200 disabled:opacity-50 disabled:pointer-events-none border border-strong rounded-md transition-colors shadow-xs">
@@ -100,11 +99,6 @@ export function BranchSwitcher() {
           </form>
         </DialogContent>
       </Dialog>
-      {toastMessage && <div role={toastError ? 'alert' : 'status'} className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-lg border border-strong bg-surface-100 p-3.5 text-xs text-foreground shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
-        <div className="h-6 w-6 flex items-center justify-center rounded-full bg-surface-200 text-foreground border border-strong shrink-0"><Check className="h-3.5 w-3.5" /></div>
-        <div className="pr-2"><div className="font-semibold text-foreground">{toastError ? 'Branch request failed' : 'Branch created'}</div><div className="text-[11px] text-foreground-lighter mt-0.5">{toastMessage}</div></div>
-        <button type="button" onClick={() => setToastMessage(null)} className="text-foreground-lighter hover:text-foreground p-1 transition-colors"><X className="h-3.5 w-3.5" /></button>
-      </div>}
     </>
   )
 }

@@ -5,6 +5,7 @@ import '@/styles/ui.css'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { MobileRestriction } from '@/components/MobileRestriction'
 import { StudioProvider } from '@/components/providers/StudioProvider'
+import { NotificationProvider } from '@/components/providers/NotificationProvider'
 
 export const metadata: Metadata = {
   title: 'Astarbase Studio',
@@ -46,7 +47,9 @@ export default function RootLayout({
       <body className="h-full w-full bg-studio text-foreground overflow-hidden font-sans">
         <ThemeProvider>
           <MobileRestriction />
-          <StudioProvider>{children}</StudioProvider>
+          <NotificationProvider>
+            <StudioProvider>{children}</StudioProvider>
+          </NotificationProvider>
         </ThemeProvider>
       </body>
     </html>

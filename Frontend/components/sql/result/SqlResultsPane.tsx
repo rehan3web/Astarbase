@@ -21,8 +21,8 @@ import {
   copyResultsAsCsv,
   downloadResultsAsCsv,
 } from '@/components/sql/export/SqlExportUtils'
-import { Alert } from '@/components/ui/alert'
 import { cn } from '@/lib/utils'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 
 export interface QueryResult {
   columns: string[]
@@ -50,7 +50,7 @@ export function SqlResultsPane({
 }: SqlResultsPaneProps) {
   const [internalTab, setInternalTab] = useState<'results' | 'chart'>('results')
   const [isExpanded, setIsExpanded] = useState(false)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const { notify } = useNotifications()
 
   const activeTab = onActiveBottomTabChange ? activeBottomTab : internalTab
   const handleTabChange = (tab: 'results' | 'chart') => {
@@ -61,39 +61,32 @@ export function SqlResultsPane({
     }
   }
 
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg)
-    const timer = setTimeout(() => setToastMessage(null), 2500)
-    return () => clearTimeout(timer)
-  }, [])
-
-  const handleCopyMarkdown = useCallback(() => {
+  const handleCopyMarkdown = useCallback(async () => {
     if (!queryResult) return
-    copyResultsAsMarkdown(queryResult)
-    showToast('Copied results as Markdown to clipboard')
-  }, [queryResult, showToast])
+    try { await copyResultsAsMarkdown(queryResult); notify('Copied results as Markdown to clipboard') }
+    catch (error) { notify(error instanceof Error ? error.message : 'Could not copy results to clipboard', 'error') }
+  }, [queryResult, notify])
 
-  const handleCopyJson = useCallback(() => {
+  const handleCopyJson = useCallback(async () => {
     if (!queryResult) return
-    copyResultsAsJson(queryResult)
-    showToast('Copied results as JSON to clipboard')
-  }, [queryResult, showToast])
+    try { await copyResultsAsJson(queryResult); notify('Copied results as JSON to clipboard') }
+    catch (error) { notify(error instanceof Error ? error.message : 'Could not copy results to clipboard', 'error') }
+  }, [queryResult, notify])
 
-  const handleCopyCsv = useCallback(() => {
+  const handleCopyCsv = useCallback(async () => {
     if (!queryResult) return
-    copyResultsAsCsv(queryResult)
-    showToast('Copied results as CSV to clipboard')
-  }, [queryResult, showToast])
+    try { await copyResultsAsCsv(queryResult); notify('Copied results as CSV to clipboard') }
+    catch (error) { notify(error instanceof Error ? error.message : 'Could not copy results to clipboard', 'error') }
+  }, [queryResult, notify])
 
   const handleDownload = useCallback(() => {
     if (!queryResult) return
-    if (onDownloadCsv) {
-      onDownloadCsv()
-    } else {
-      downloadResultsAsCsv(queryResult)
+    if (onDownloadCsv) onDownloadCsv()
+    else {
+      try { downloadResultsAsCsv(queryResult); notify('Query results exported as CSV') }
+      catch (error) { notify(error instanceof Error ? error.message : 'Could not export query results', 'error') }
     }
-    showToast('Downloaded results as CSV')
-  }, [queryResult, onDownloadCsv, showToast])
+  }, [queryResult, onDownloadCsv, notify])
 
   // Keyboard shortcuts matching Supabase Studio:
   // Shift + Ctrl + M: Markdown
@@ -130,17 +123,6 @@ export function SqlResultsPane({
         'shrink-0 flex flex-col bg-surface-100 overflow-hidden border-t border-default transition-all duration-200 relative'
       )}
     >
-      {/* Toast Notification */}
-      {toastMessage && (
-        <Alert
-          position="bottom-right"
-          variant="success"
-          onClose={() => setToastMessage(null)}
-        >
-          {toastMessage}
-        </Alert>
-      )}
-
       {/* Results Tab Bar */}
       <div className="h-9 shrink-0 border-b border-default bg-dash-sidebar flex items-center justify-between px-3 select-none">
         {/* Tabs on Left: Results | Chart */}

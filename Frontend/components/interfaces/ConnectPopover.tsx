@@ -3,19 +3,22 @@
 import React, { useState } from 'react'
 import { Check, Copy, Database, Plug, Server } from 'lucide-react'
 import { useStudio } from '@/components/providers/StudioProvider'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 export function ConnectPopover() {
+  const { notify } = useNotifications()
   const { database, branch } = useStudio()
   const [copied, setCopied] = useState(false)
   async function copyDetails() {
     try {
       await navigator.clipboard.writeText(`Database: ${database}\nDirect port: POSTGRES_PUBLIC_PORT (Backend/.env)\nPooler port: PGBOUNCER_PUBLIC_PORT (Backend/.env)\nHost: Docker host configured for this deployment\nCredentials: configured database role; not available in Studio`)
       setCopied(true); window.setTimeout(() => setCopied(false), 1800)
-    } catch { setCopied(false) }
+      notify('Connection details copied')
+    } catch (error) { setCopied(false); notify(error instanceof Error ? error.message : 'Could not copy connection details', 'error') }
   }
   return <Dialog>
     <DialogTrigger asChild><Button variant="primary" size="small" iconLeft={<Plug className="h-3.5 w-3.5 rotate-90" />} className="gap-1.5 font-medium shadow-xs rounded-full px-3 ml-3"><span>Connect</span></Button></DialogTrigger>

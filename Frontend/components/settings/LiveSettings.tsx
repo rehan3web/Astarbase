@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input'
 import { api, AdminSettings, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useTheme } from '@/components/providers/ThemeProvider'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 
 export function LiveSettings() {
   const { settings, database, reload } = useStudio()
   const { setTheme } = useTheme()
+  const { notify } = useNotifications()
   const [values, setValues] = useState<AdminSettings>(settings || { projectName: 'Astarbase', defaultRowLimit: 100, theme: 'system' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -23,7 +25,8 @@ export function LiveSettings() {
       await reload()
       setTheme(values.theme === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' : values.theme)
       setSaved(true)
-    } catch (e) { setError(errorMessage(e)) } finally { setBusy(false) }
+      notify('Settings saved')
+    } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
   }
   return (
     <div className="max-w-4xl mx-auto p-12">

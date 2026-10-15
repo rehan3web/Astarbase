@@ -13,6 +13,7 @@ import { downloadResultsAsCsv } from '@/components/sql/export/SqlExportUtils'
 import { api, SqlResponse, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { parseSqlOutput } from '@/lib/sql-results'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 
 const INITIAL_FOLDERS: SqlFolder[] = [
   { id: 'folder_1', name: 'Untitled folder', visibility: 'private' },
@@ -34,6 +35,7 @@ const INITIAL_SNIPPETS: SqlSnippet[] = [
 
 export function SqlEditorView() {
   const { database } = useStudio()
+  const { notify } = useNotifications()
   const [rawOutput, setRawOutput] = useState('')
   const executionVersion = useRef(0)
   const [folders, setFolders] = useState<SqlFolder[]>(INITIAL_FOLDERS)
@@ -147,11 +149,13 @@ export function SqlEditorView() {
       setRawOutput(`${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`)
       setQueryResult({ ...parsed, executionTimeMs: result.durationMs, rowCount: parsed.rows.length, status: 'success', message: result.stderr || (parsed.rows.length ? undefined : result.stdout) })
       setActiveBottomTab('results')
+      notify('Query completed')
     } catch (error) {
       if (version !== executionVersion.current) return
       setQueryResult({ columns: [], rows: [], executionTimeMs: 0, rowCount: 0, status: 'error', message: errorMessage(error) })
+      notify(errorMessage(error), 'error')
     } finally { if (version === executionVersion.current) setIsExecuting(false) }
-  }, [currentSql, database, isExecuting])
+  }, [currentSql, database, isExecuting, notify])
   useEffect(() => { executionVersion.current++; setQueryResult(null); setRawOutput(''); setIsExecuting(false) }, [database])
 
   // Format Query
@@ -354,7 +358,8 @@ export function SqlEditorView() {
   // Download Results CSV
   const handleDownloadCsv = () => {
     if (queryResult) {
-      downloadResultsAsCsv(queryResult)
+      try { downloadResultsAsCsv(queryResult); notify('Query results exported as CSV') }
+      catch (error) { notify(errorMessage(error), 'error') }
     }
   }
 

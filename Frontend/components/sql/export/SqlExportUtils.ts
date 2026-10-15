@@ -3,7 +3,7 @@ import { QueryResult } from '@/components/sql/result/SqlResultsPane'
 /**
  * Copy query results as a Markdown table to clipboard.
  */
-export function copyResultsAsMarkdown(queryResult: QueryResult): boolean {
+export async function copyResultsAsMarkdown(queryResult: QueryResult): Promise<boolean> {
   if (!queryResult || !queryResult.columns) return false
   const headers = `| ${queryResult.columns.join(' | ')} |`
   const divider = `| ${queryResult.columns.map(() => '---').join(' | ')} |`
@@ -11,29 +11,29 @@ export function copyResultsAsMarkdown(queryResult: QueryResult): boolean {
     .map((r) => `| ${queryResult.columns.map((c) => r[c] ?? '').join(' | ')} |`)
     .join('\n')
   const md = `${headers}\n${divider}\n${rows}`
-  navigator.clipboard.writeText(md)
+  await navigator.clipboard.writeText(md)
   return true
 }
 
 /**
  * Copy query results as JSON to clipboard.
  */
-export function copyResultsAsJson(queryResult: QueryResult): boolean {
+export async function copyResultsAsJson(queryResult: QueryResult): Promise<boolean> {
   if (!queryResult) return false
-  navigator.clipboard.writeText(JSON.stringify(queryResult.rows, null, 2))
+  await navigator.clipboard.writeText(JSON.stringify(queryResult.rows, null, 2))
   return true
 }
 
 /**
  * Copy query results as CSV to clipboard.
  */
-export function copyResultsAsCsv(queryResult: QueryResult): boolean {
+export async function copyResultsAsCsv(queryResult: QueryResult): Promise<boolean> {
   if (!queryResult || !queryResult.columns) return false
   const headers = queryResult.columns.join(',')
   const rows = queryResult.rows
     .map((r) => queryResult.columns.map((c) => `"${r[c] ?? ''}"`).join(','))
     .join('\n')
-  navigator.clipboard.writeText(`${headers}\n${rows}`)
+  await navigator.clipboard.writeText(`${headers}\n${rows}`)
   return true
 }
 

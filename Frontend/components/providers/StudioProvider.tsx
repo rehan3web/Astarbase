@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { api, Branch, AdminSettings, errorMessage } from '@/lib/api'
 import { useTheme } from './ThemeProvider'
+import { useNotifications } from './NotificationProvider'
 
 type Studio = { branches: Branch[]; database: string; branch: Branch | undefined; settings: AdminSettings | null; selectBranch: (name: string) => void; reload: () => Promise<void> }
 const Context = createContext<Studio | null>(null)
@@ -13,6 +14,7 @@ export const useStudio = () => {
 }
 export function StudioProvider({ children }: { children: React.ReactNode }) {
   const { setTheme } = useTheme()
+  const { notify } = useNotifications()
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [configured, setConfigured] = useState(true)
   const [token, setToken] = useState('')
@@ -47,7 +49,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error)
       setToken(''); setAuthenticated(true)
-    } catch (e) { setError(errorMessage(e)) } finally { setBusy(false) }
+      notify('Signed in successfully')
+    } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
   }
   const branch = branches.find(b => b.name === selected)
   if (authenticated === null) return <div className="h-screen grid place-items-center bg-studio text-foreground-lighter">Checking Studio session…</div>
