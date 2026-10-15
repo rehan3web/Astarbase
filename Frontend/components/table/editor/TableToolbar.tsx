@@ -2,7 +2,6 @@
 
 import React from 'react'
 import {
-  Check,
   ChevronDown,
   Columns,
   FileSpreadsheet,
@@ -46,15 +45,12 @@ interface TableToolbarProps {
   onSortColumnChange: (value: string) => void
   sortDirection: 'asc' | 'desc'
   onSortDirectionChange: (value: 'asc' | 'desc') => void
-  selectedRole: string
-  onSelectedRoleChange: (value: string) => void
   onCopyCsv: () => void
   onCopyJson: () => void
   onCopySql: () => void
   onExportCsv: () => void
   onExportJson: () => void
   onDeleteSelected: () => void
-  onToggleRls: () => void
   onAddRlsPolicy: () => void
   onRefresh: () => void
   onInsertRow: () => void
@@ -70,15 +66,12 @@ export function TableToolbar({
   onSortColumnChange,
   sortDirection,
   onSortDirectionChange,
-  selectedRole,
-  onSelectedRoleChange,
   onCopyCsv,
   onCopyJson,
   onCopySql,
   onExportCsv,
   onExportJson,
   onDeleteSelected,
-  onToggleRls,
   onAddRlsPolicy,
   onRefresh,
   onInsertRow,
@@ -131,8 +124,11 @@ export function TableToolbar({
 
           {/* Right side: Delete button */}
           <button
+            type="button"
             onClick={onDeleteSelected}
-            className="inline-flex items-center gap-1.5 text-xs font-medium h-[28px] px-2.5 rounded-md bg-[#9E3735] hover:bg-[#9E3735]/90 text-white transition-colors cursor-pointer select-none"
+            disabled={!selectedRowIds.size}
+            title={selectedRowIds.size ? 'Delete the selected rows' : 'Select at least one row first'}
+            className="inline-flex items-center gap-1.5 text-xs font-medium h-[28px] px-2.5 rounded-md bg-[#9E3735] hover:bg-[#9E3735]/90 text-white transition-colors cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Trash className="h-3.5 w-3.5" />
             <span>
@@ -242,31 +238,9 @@ export function TableToolbar({
               Add RLS policy
             </Button>
 
-            {/* Role postgres dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="default"
-                  size="small"
-                  className="text-xs shrink-0 whitespace-nowrap px-2.5 h-[28px] gap-1 text-foreground-lighter hover:text-foreground cursor-pointer"
-                >
-                  <span>Role <span className="font-semibold text-foreground font-mono">{selectedRole}</span></span>
-                  <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-36">
-                {['postgres', 'anon', 'authenticated', 'service_role'].map((role) => (
-                  <DropdownMenuItem
-                    key={role}
-                    onClick={() => onSelectedRoleChange(role)}
-                    className="flex items-center justify-between text-xs font-mono"
-                  >
-                    <span>{role}</span>
-                    {selectedRole === role && <Check className="h-3.5 w-3.5 text-brand-500" />}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="default" size="small" disabled title="Role impersonation is not exposed by the connected API" className="text-xs shrink-0 whitespace-nowrap px-2.5 h-[28px] gap-1 text-foreground-muted">
+              Role <span className="font-semibold font-mono">unavailable</span><ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+            </Button>
 
             {/* More options button */}
             <Button
@@ -274,6 +248,8 @@ export function TableToolbar({
               size="small"
               className="h-[28px] w-[28px] p-0 flex items-center justify-center text-foreground-lighter hover:text-foreground shrink-0 cursor-pointer"
               title="More options"
+              disabled
+              aria-label="More table options unavailable"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </Button>
@@ -327,18 +303,8 @@ export function TableToolbar({
                   </kbd>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => {
-                    const input = document.createElement('input')
-                    input.type = 'file'
-                    input.accept = '.csv'
-                    input.onchange = (e: any) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        alert(`File ${file.name} selected for import`)
-                      }
-                    }
-                    input.click()
-                  }}
+                  disabled
+                  title="Bulk CSV import is not provided by the connected API"
                   className="flex items-center justify-between py-1.5 px-2 text-xs"
                 >
                   <div className="flex items-center gap-2">

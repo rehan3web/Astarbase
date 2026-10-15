@@ -20,16 +20,19 @@ interface EditTableModalProps {
   /** Names already used in the schema (excluding the table being edited) */
   existingNames: string[]
   onSave: (table: TableDefinition, values: EditTableValues) => Promise<void> | void
+  securityEditable?: boolean
 }
 
 function Toggle({
   id,
   checked,
   onChange,
+  disabled = false,
 }: {
   id: string
   checked: boolean
   onChange: (v: boolean) => void
+  disabled?: boolean
 }) {
   return (
     <button
@@ -37,9 +40,10 @@ function Toggle({
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50',
+        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 disabled:cursor-not-allowed disabled:opacity-40',
         checked ? 'bg-[#086E43]' : 'bg-surface-300'
       )}
     >
@@ -59,6 +63,7 @@ export function EditTableModal({
   table,
   existingNames,
   onSave,
+  securityEditable = true,
 }: EditTableModalProps) {
   const [values, setValues] = useState<EditTableValues>({
     name: '',
@@ -156,11 +161,7 @@ export function EditTableModal({
               <p className="text-sm text-foreground">Enable Row Level Security (RLS)</p>
               <p className="text-xs text-foreground-lighter">Restrict access to rows using policies</p>
             </div>
-            <Toggle
-              id="edit-table-rls"
-              checked={values.rlsEnabled}
-              onChange={(v) => setValues((s) => ({ ...s, rlsEnabled: v }))}
-            />
+            {securityEditable ? <Toggle id="edit-table-rls" checked={values.rlsEnabled} onChange={(v) => setValues((s) => ({ ...s, rlsEnabled: v }))} /> : <span className="text-[10px] uppercase tracking-wider border border-strong rounded-full px-2 py-1 text-foreground-muted">Unavailable</span>}
           </div>
 
           <div className="flex items-start justify-between gap-4">
@@ -168,12 +169,9 @@ export function EditTableModal({
               <p className="text-sm text-foreground">Enable Realtime</p>
               <p className="text-xs text-foreground-lighter">Broadcast changes on this table</p>
             </div>
-            <Toggle
-              id="edit-table-realtime"
-              checked={values.realtimeEnabled}
-              onChange={(v) => setValues((s) => ({ ...s, realtimeEnabled: v }))}
-            />
+            {securityEditable ? <Toggle id="edit-table-realtime" checked={values.realtimeEnabled} onChange={(v) => setValues((s) => ({ ...s, realtimeEnabled: v }))} /> : <span className="text-[10px] uppercase tracking-wider border border-strong rounded-full px-2 py-1 text-foreground-muted">Unavailable</span>}
           </div>
+          {!securityEditable && <p className="rounded border border-amber-500/25 bg-amber-500/5 p-2.5 text-[11px] text-foreground-lighter">RLS and realtime settings are not returned or writable through the connected API.</p>}
           {/* Hidden submit so Enter saves */}
           <button type="submit" className="hidden" />
         </form>

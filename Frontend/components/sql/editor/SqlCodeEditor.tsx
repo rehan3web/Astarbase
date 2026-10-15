@@ -1,14 +1,37 @@
 'use client'
-import React, { useState } from 'react'
+
+import React from 'react'
 import dynamic from 'next/dynamic'
 import { useTheme } from '@/components/providers/ThemeProvider'
-const Monaco = dynamic(() => import('@monaco-editor/react'), { ssr: false })
-export function SqlCodeEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => <div className="flex-1 flex items-center justify-center bg-surface-100 text-foreground-lighter text-xs font-mono">Loading SQL Editor…</div>,
+})
+interface SqlCodeEditorProps { value: string; onChange: (value: string) => void }
+export function SqlCodeEditor({ value, onChange }: SqlCodeEditorProps) {
   const { theme } = useTheme()
-  const [enhanced, setEnhanced] = useState(false)
-  return <div className="flex-1 min-h-[220px] flex flex-col border-b border-default">
-    <div className="text-right px-3 py-1 text-[10px] text-foreground-lighter"><button onClick={() => setEnhanced(!enhanced)}>{enhanced ? 'Use plain editor' : 'Enable syntax editor (loads Monaco)'}</button></div>
-    {enhanced ? <Monaco height="100%" language="sql" theme={theme === 'dark' ? 'vs-dark' : 'light'} value={value} onChange={v => onChange(v || '')} options={{ fontSize: 13, minimap: { enabled: false }, automaticLayout: true }} /> :
-      <textarea aria-label="SQL query" spellCheck={false} value={value} onChange={e => onChange(e.target.value)} className="flex-1 w-full resize-none bg-studio text-foreground p-4 font-mono text-[13px] leading-6 outline-none" />}
+  return <div className={`flex-1 min-h-[220px] relative border-b border-default ${theme === 'dark' ? 'bg-[#171717]' : 'bg-[#ffffff]'}`}>
+    <label htmlFor="sql-monaco-editor" className="sr-only">SQL query</label>
+    <MonacoEditor
+      height="100%"
+      language="sql"
+      theme={theme === 'dark' ? 'vs-dark' : 'light'}
+      value={value}
+      onChange={value => onChange(value || '')}
+      options={{
+        ariaLabel: 'SQL query',
+        fontSize: 13,
+        fontFamily: "'Source Code Pro', monospace",
+        lineNumbers: 'on',
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        wordWrap: 'on',
+        automaticLayout: true,
+        padding: { top: 12, bottom: 12 },
+        cursorBlinking: 'smooth',
+        renderLineHighlight: 'line',
+      }}
+    />
   </div>
 }

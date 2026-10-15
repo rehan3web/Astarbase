@@ -1,2 +1,4 @@
-import { redirect } from 'next/navigation'
-export default function Dashboard() { redirect('/') }
+'use client'
+import { AppLayout } from '@/components/layouts/AppLayout'
+import { ProjectHomeView } from '@/components/dashboard/ProjectHomeView'
+export default function Dashboard() { return <AppLayout headerTitle="Home"><ProjectHomeView /></AppLayout> }
