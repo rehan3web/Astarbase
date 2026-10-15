@@ -3,6 +3,9 @@
 Single-machine Admin Studio with a connected Next.js frontend, Node.js/TypeScript
 backend, Postgres, PgBouncer, and SQLite admin settings.
 
+Backend and PgBouncer startup logic use Node.js 24 + TypeScript. No Python
+interpreter, scripts or dependencies are required by the Docker stack.
+
 ## Run and test on your Docker host
 
 Requirements: Linux, local Docker Engine at `/var/run/docker.sock` and Docker

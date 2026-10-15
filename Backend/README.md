@@ -118,8 +118,12 @@ connection-URL, or TCP fallbacks** in the Admin database client or Docker client
 `DOCKER_SOCKET` and `PG_SOCKET_DIR` reject other values. Healthcheck HTTP/TCP probes
 only check the API/PgBouncer listeners; they do not carry Admin-to-Postgres traffic.
 
-PgBouncer uses `[databases] * = host=/var/run/postgresql port=5432`. It forwards the
-requested database name, so `branch_dev` works without configuration reloads.
+PgBouncer uses `[databases] * = host=/var/run/postgresql port=5432`. Its Docker entrypoint is native TypeScript
+on Node.js 24, runs as a non-root user, and replaces itself with PgBouncer after
+writing private config files. No Python runtime or build step is required.
+
+PgBouncer forwards the requested database name, so `branch_dev` works without
+configuration reloads.
 Its initial SCRAM-authenticated login is `DB_USER`; new database roles require
 corresponding PgBouncer authentication configuration. It uses transaction pooling;
 use the direct Postgres port for session-bound clients and migrations.
