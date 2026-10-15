@@ -35,7 +35,8 @@ Use `docker compose ps` and `docker compose logs studio frontend` to inspect
 startup. For the legacy command, also pass `--env-file Backend/.env` to those
 commands. Do not use `down -v` unless you intend to delete database volumes.
 
-1. Open **http://127.0.0.1:5000** (or the `STUDIO_PORT` you configured).
+1. Open **http://YOUR_VPS_IP:5000** remotely, or **http://127.0.0.1:5000**
+   on the Docker host (use your configured `STUDIO_PORT` if different).
 2. Sign in with the admin token you set in `.env` (or your legacy `Backend/.env`).
 3. Open SQL and run the following on `main`:
 
@@ -68,8 +69,10 @@ Postgres/PgBouncer public ports (defaults 5432/6432).
 
 ## Security
 
-Studio and the diagnostic API are bound to the Docker host's loopback by default.
-Use an SSH tunnel or a trusted HTTPS reverse proxy for remote access. Enable
+Studio's frontend is publicly bound to `0.0.0.0` (port 5000 by default), as requested.
+The diagnostic API remains bound to the Docker host's loopback.
+Restrict the Studio port to trusted IPs with host/provider firewall rules and use
+a trusted HTTPS reverse proxy before sending credentials over the Internet. Enable
 `STUDIO_COOKIE_SECURE=true` for HTTPS. Database ports are public as requested:
 restrict host firewall rules and configure external TLS before Internet use.
 The admin token permits arbitrary SQL and powerful Docker operations; protect it.

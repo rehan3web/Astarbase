@@ -36,5 +36,8 @@ test('Compose alone loads root .env and wires all four services in dependency or
     assert.ok(services.studio.build.dockerfile.endsWith('Backend/dockerfile'));
     assert.ok(services.frontend.build.dockerfile.endsWith('Frontend/dockerfile'));
     for (const name of ['postgres', 'pgbouncer']) assert.equal(services[name].ports[0].host_ip, '0.0.0.0');
+    assert.equal(services.frontend.ports[0].host_ip, '0.0.0.0');
+    assert.equal(services.frontend.ports[0].published, '5000');
+    assert.equal(services.studio.ports[0].host_ip, '127.0.0.1');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
