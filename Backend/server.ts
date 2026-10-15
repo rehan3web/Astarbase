@@ -3,19 +3,20 @@ import { createApp, createServices } from './src/index.js';
 import { pushDatabase } from './src/db/push.js';
 import { startCompose } from './src/setup.js';
 import { startAdminListeners } from './src/services/system/listener.service.js';
+import { startupStep, formatStartupFailure } from './src/services/system/startup.service.js';
 
 async function main() {
-  const config = loadConfig();
+  const config = await startupStep('configuration', () => loadConfig());
   if (config.AUTO_START_COMPOSE === 'true') {
     // Host entry point: Compose owns the long-running API (and its DB push).
-    await startCompose();
+    await startupStep('compose', () => startCompose());
     return;
   }
-  const services = createServices(config);
+  const services = await startupStep('admin-store', () => createServices(config));
   try {
-    await services.postgres.docker.ready();
-    await pushDatabase(config, services.catalog.store);
-    const listeners = await startAdminListeners(createApp(config, services), config.PORT);
+    await startupStep('docker', () => services.postgres.docker.ready());
+    await startupStep('database', () => pushDatabase(config, services.catalog.store));
+    const listeners = await startupStep('listeners', () => startAdminListeners(createApp(config, services), config.PORT));
     console.log(`Admin API ready on shared Unix socket; health listener on ${config.PORT}`);
     let closing = false;
     for (const signal of ['SIGTERM', 'SIGINT'] as const) {
@@ -31,7 +32,7 @@ async function main() {
     throw error;
   }
 }
-main().catch(() => {
-  console.error('Startup failed. Check .env (or legacy Backend/.env), the local Docker daemon, and the shared Unix sockets. No TCP fallback is allowed.');
+main().catch(error => {
+  console.error(formatStartupFailure(error));
   process.exitCode = 1;
 });
