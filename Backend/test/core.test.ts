@@ -125,6 +125,10 @@ test('row editing validates composite primary keys and encodes JSON arrays', () 
 });
 
 test('PgBouncer forwards any database name and Compose persists separate admin and dump folders', async () => {
+  const dockerfile = await readFile(new URL('../../docker/pgbouncer/Dockerfile', import.meta.url), 'utf8');
+  // Alpine installs root-owned config files, not just the parent directory.
+  assert.match(dockerfile, /chown -R studio-pool:studio-pool \/etc\/pgbouncer/);
+  assert.match(dockerfile, /USER studio-pool/);
   const pool = await readFile(new URL('../../docker/pgbouncer/entrypoint.py', import.meta.url), 'utf8');
   assert.match(pool, /^\* = host=\/var\/run\/postgresql port=5432$/m);
   const compose = await readFile(new URL('../../docker-compose.yml', import.meta.url), 'utf8');
