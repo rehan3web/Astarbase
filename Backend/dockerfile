@@ -1,0 +1,22 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY Backend/package.json Backend/package.json
+COPY Frontend/package.json Frontend/package.json
+RUN pnpm install --frozen-lockfile
+COPY Backend Backend
+RUN pnpm --filter astarbase-backend build
+
+FROM node:24-alpine
+WORKDIR /app
+RUN corepack enable
+COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+COPY --from=build /app/Backend/package.json Backend/package.json
+COPY --from=build /app/Frontend/package.json Frontend/package.json
+RUN pnpm install --frozen-lockfile --prod
+COPY --from=build /app/Backend/dist Backend/dist
+WORKDIR /app/Backend
+ENV NODE_ENV=production AUTO_START_COMPOSE=false
+EXPOSE 8000
+CMD ["node", "dist/server.js"]

@@ -1,0 +1,24 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY Backend/package.json Backend/package.json
+COPY Frontend/package.json Frontend/package.json
+RUN pnpm install --frozen-lockfile
+COPY Frontend Frontend
+RUN pnpm --filter studio build
+
+FROM node:24-alpine
+WORKDIR /app
+RUN corepack enable
+COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
+COPY --from=build /app/Backend/package.json Backend/package.json
+COPY --from=build /app/Frontend/package.json Frontend/package.json
+RUN pnpm install --prod --frozen-lockfile
+COPY --from=build /app/Frontend/.next Frontend/.next
+COPY --from=build /app/Frontend/public Frontend/public
+COPY --from=build /app/Frontend/next.config.ts Frontend/next.config.ts
+WORKDIR /app/Frontend
+ENV NODE_ENV=production
+EXPOSE 5000
+CMD ["pnpm", "start"]

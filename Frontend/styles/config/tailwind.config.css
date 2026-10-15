@@ -1,0 +1,330 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Border shorthand tokens ── */
+  --color-border-default: var(--border-default);
+  --color-border-muted: var(--border-muted);
+  --color-border-strong: var(--border-strong);
+  --color-border-overlay: var(--border-overlay);
+  --color-border-control: var(--border-control);
+  --color-border-alternative: var(--border-alternative);
+
+  /* Shorthand: border-strong, border-overlay, border-control, border-default, border-alternative */
+  --color-default: var(--border-default);
+  --color-strong: var(--border-strong);
+  --color-muted: var(--border-muted);
+  --color-control: var(--border-control);
+
+  /* ── Background tokens ── */
+  --color-background-default: var(--background-default);
+  --color-background-dash-sidebar: var(--background-dash-sidebar);
+  --color-background-surface-75: var(--background-surface-75);
+  --color-background-surface-100: var(--background-surface-100);
+  --color-background-surface-200: var(--background-surface-200);
+  --color-background-surface-300: var(--background-surface-300);
+  --color-background-selection: var(--background-selection);
+  --color-background-alternative: var(--background-alternative);
+  --color-background-control: var(--background-control);
+  --color-background-overlay: var(--background-overlay);
+  --color-background: var(--background-default);
+
+  /* Shorthand bg tokens */
+  --color-dash-sidebar: var(--background-dash-sidebar);
+  --color-studio: var(--background-default);
+  --color-surface-75: var(--background-surface-75);
+  --color-surface-100: var(--background-surface-100);
+  --color-surface-200: var(--background-surface-200);
+  --color-surface-300: var(--background-surface-300);
+  --color-alternative: var(--background-alternative);
+  --color-overlay: var(--background-overlay);
+  --color-overlay-hover: var(--background-surface-200);
+
+  /* ── Foreground tokens ── */
+  --color-foreground-default: var(--foreground-default);
+  --color-foreground-light: var(--foreground-light);
+  --color-foreground-lighter: var(--foreground-lighter);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground: var(--foreground-default);
+
+  /* ── Brand tokens ── */
+  --color-brand-default: var(--brand-default);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand: var(--brand-500);
+
+  /* ── Semantic tokens ── */
+  --color-warning-default: var(--warning-default);
+  --color-warning: var(--warning-default);
+  --color-destructive-default: var(--destructive-default);
+  --color-destructive: var(--destructive-default);
+  --color-primary: var(--brand-500);
+  --color-primary-bright: var(--primary-bright);
+
+  /* ── Extended gray/green shades for Supabase ── */
+  --color-gray-1100: var(--foreground-light);
+  --color-green-1000: #166534;
+
+  --spacing-card: 1.5rem;
+}
+
+:root {
+  --background-dash-sidebar: #121212;
+  --background-default: #171717;
+  --background-surface-75: #191919;
+  --background-surface-100: #1c1c1c;
+  --background-surface-200: #232323;
+  --background-surface-300: #2a2a2a;
+  --background-alternative: #1e1e1e;
+  --background-control: #242424;
+  --background-overlay: #222222;
+  --background-selection: #2e2e2e;
+
+  --border-default: #282828;
+  --border-muted: #202020;
+  --border-strong: #343434;
+  --border-overlay: #2e2e2e;
+  --border-control: #333333;
+  --border-alternative: #2a2a2a;
+
+  --foreground-default: #ededed;
+  --foreground-light: #a1a1a1;
+  --foreground-lighter: #737373;
+  --foreground-muted: #525252;
+
+  --brand-default: #3ecf8e;
+  --brand-200: #a3f3cb;
+  --brand-300: #6ee7b7;
+  --brand-400: #5fe3a1;
+  --brand-500: #3ecf8e;
+  --brand-600: #24b47e;
+  --brand-accent: rgba(62, 207, 142, 0.12);
+
+  --destructive-default: #ef4444;
+  --destructive-600: #dc2626;
+
+  --warning-default: #f59e0b;
+  --warning: #f59e0b;
+
+  --primary-bright: #3ecf8e;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-heading: 'Manrope', var(--font-sans);
+
+  /* ── Studio oklch button system ── */
+  --hue: 157.5;
+  --surface-hue: var(--hue);
+  --primary-hue: var(--hue);
+  --chroma: .016;
+  --surface: .19;
+  --foreground-lightness: .95;
+  --contrast: .5;
+  --contrast-delta: calc((var(--contrast) - .5) / .5);
+  --contrast-up: max(0, var(--contrast-delta));
+  --contrast-down: max(0, calc(var(--contrast-delta) * -1));
+  --contrast-border-floor: .05;
+  --contrast-border-linear: calc(var(--contrast-border-floor) + (1 - var(--contrast-border-floor)) * var(--contrast));
+  --contrast-border: calc(var(--contrast-border-linear) * var(--contrast-border-linear));
+  --tone-span: calc(var(--foreground-lightness) - var(--surface));
+  --elevation-step: calc(var(--tone-span) * .04);
+  --surface-overlay-unit: calc(var(--elevation-step) / max(var(--tone-span), calc(var(--tone-span) * -1)));
+  --muted-alpha: calc(var(--surface-overlay-unit) * 1);
+  --accent-alpha: calc(var(--surface-overlay-unit) * 1.5);
+
+  --foreground-chroma: calc(var(--chroma) * .55);
+  --background: oklch(var(--surface) calc(var(--chroma) * .5) var(--surface-hue));
+  --foreground: oklch(calc(var(--surface) + var(--tone-span) * .9) var(--foreground-chroma) var(--surface-hue));
+  --card: oklch(from var(--background) calc(l + var(--elevation-step)) c h);
+  --popover: oklch(from var(--background) calc(l + var(--elevation-step) * 1.5) c h);
+  --secondary: oklch(from var(--background) calc(l + var(--elevation-step) * 2) c h);
+
+  /* Primary solid (green brand button) */
+  --primary: #086E43;
+  --primary-bright: #0a8451;
+  --button-fill-hover-delta: .04;
+  --primary-hover: #065836;
+  --primary-solid: #086E43;
+  --primary-solid-hover: #065836;
+  --primary-solid-foreground: #ffffff;
+  --primary-border: #338161;
+
+  /* Control surface (default button) */
+  --control-raised: oklch(1 0 0 / calc(var(--muted-alpha) * .65));
+  --control: var(--control-raised);
+  --input: oklch(from var(--foreground) l calc(c * .5) h / calc(3% + 38% * var(--contrast-border)));
+  --border: oklch(from var(--foreground) l calc(c * .54) h / calc(2% + 20% * var(--contrast-border)));
+  --border-button-default: var(--border);
+  --border-stronger: oklch(from var(--foreground) l calc(c * .5) h / calc(5% + 45% * var(--contrast-border)));
+  --border-button-hover: var(--border-stronger);
+  --ring: oklch(from var(--primary-bright) l c h / 55%);
+
+  /* Destructive */
+  --destructive-hue: 25;
+  --expressive-chroma: .14;
+  --destructive-solid: oklch(.55 var(--expressive-chroma) var(--destructive-hue));
+  --destructive-solid-hover: oklch(from var(--destructive-solid) calc(l + var(--button-fill-hover-delta) * var(--tone-span) / max(var(--tone-span), calc(var(--tone-span) * -1))) c h);
+  --destructive-foreground: oklch(.95 .005 var(--destructive-hue));
+
+  /* Warning */
+  --warning-hue: 80;
+  --warning-solid: oklch(.8 var(--expressive-chroma) var(--warning-hue));
+  --warning-foreground: oklch(from var(--warning-solid) clamp(.12, calc((.62 - l) * 100), .99) calc(c * .08) h);
+
+  /* Button shadow system */
+  --button-shadow-opacity: .2;
+  --button-edge-strength: calc(var(--contrast-border, .275625) / .275625);
+  --button-edge-color: 0deg 0% 100%;
+  --button-shadow-raised: 0 0 0 1px oklch(from var(--foreground) l c h / calc(var(--button-shadow-opacity) * .4)),
+    0 1px 2px oklch(from var(--foreground) l c h / calc(var(--button-shadow-opacity) * .3)),
+    inset 0 .5px 0 hsl(var(--button-edge-color) / calc(.08 * var(--button-edge-strength))),
+    inset 0 -1px 0 oklch(0 0 0 / .05);
+  --button-shadow-pressed: 0 0 0 1px oklch(from var(--foreground) l c h / calc(var(--button-shadow-opacity) * .5)),
+    inset 0 1px 2px oklch(0 0 0 / .08);
+}
+
+.dark,
+[data-theme='dark'] {
+  --background-dash-sidebar: #121212;
+  --background-default: #171717;
+  --background-surface-75: #191919;
+  --background-surface-100: #1c1c1c;
+  --background-surface-200: #232323;
+  --background-surface-300: #2a2a2a;
+  --background-alternative: #1e1e1e;
+  --background-control: #242424;
+  --background-overlay: #222222;
+  --background-selection: #2e2e2e;
+
+  --border-default: #282828;
+  --border-muted: #202020;
+  --border-strong: #343434;
+  --border-overlay: #2e2e2e;
+  --border-control: #333333;
+  --border-alternative: #2a2a2a;
+
+  --foreground-default: #ededed;
+  --foreground-light: #a1a1a1;
+  --foreground-lighter: #737373;
+  --foreground-muted: #525252;
+
+  --primary-border: #338161;
+}
+
+[data-theme='light'],
+.light {
+  --background-dash-sidebar: #f8f9fa;
+  --background-default: #ffffff;
+  --background-surface-75: #fafafa;
+  --background-surface-100: #f5f5f5;
+  --background-surface-200: #ebebeb;
+  --background-surface-300: #e0e0e0;
+  --background-alternative: #f9fafb;
+  --background-control: #f3f4f6;
+  --background-overlay: #ffffff;
+  --background-selection: #e5e7eb;
+
+  --border-default: #e0e0e0;
+  --border-muted: #ebebeb;
+  --border-strong: #d1d5db;
+  --border-overlay: #e0e0e0;
+  --border-control: #d1d5db;
+  --border-alternative: #e5e7eb;
+
+  --foreground-default: #111827;
+  --foreground-light: #4b5563;
+  --foreground-lighter: #6b7280;
+  --foreground-muted: #9ca3af;
+
+  --brand-default: #24b47e;
+  --brand-200: #6ee7b7;
+  --brand-300: #34d399;
+  --brand-400: #2bc48a;
+  --brand-500: #24b47e;
+  --brand-600: #1a9268;
+  --brand-accent: rgba(36, 180, 126, 0.10);
+
+  --destructive-default: #dc2626;
+  --destructive-600: #b91c1c;
+
+  --warning-default: #d97706;
+  --warning: #d97706;
+
+  --primary-bright: #24b47e;
+
+  color-scheme: light;
+
+  /* ── Studio oklch button system (light surface) ── */
+  --surface: .97;
+  --foreground-lightness: .15;
+  --tone-span: calc(var(--foreground-lightness) - var(--surface));
+  --elevation-step: calc(var(--tone-span) * .04);
+  --surface-overlay-unit: calc(var(--elevation-step) / max(var(--tone-span), calc(var(--tone-span) * -1)));
+  --muted-alpha: calc(var(--surface-overlay-unit) * 1);
+  --accent-alpha: calc(var(--surface-overlay-unit) * 1.5);
+
+  --foreground-chroma: calc(var(--chroma) * .55);
+  --background: oklch(var(--surface) calc(var(--chroma) * .5) var(--surface-hue));
+  --foreground: oklch(calc(var(--surface) + var(--tone-span) * .9) var(--foreground-chroma) var(--surface-hue));
+  --card: oklch(from var(--background) calc(l + var(--elevation-step)) c h);
+  --popover: oklch(from var(--background) calc(l + var(--elevation-step) * 1.5) c h);
+  --secondary: oklch(from var(--background) calc(l + var(--elevation-step) * 2) c h);
+
+  --primary: #086E43;
+  --primary-bright: #0a8451;
+  --primary-hover: #065836;
+  --primary-solid: #086E43;
+  --primary-solid-hover: #065836;
+  --primary-solid-foreground: #ffffff;
+  --primary-border: transparent;
+
+  --control-raised: oklch(0 0 0 / calc(var(--muted-alpha) * .35));
+  --control: var(--control-raised);
+  --input: oklch(from var(--foreground) l calc(c * .5) h / calc(3% + 38% * var(--contrast-border)));
+  --border: oklch(from var(--foreground) l calc(c * .54) h / calc(4% + 18% * var(--contrast-border)));
+  --border-button-default: var(--border);
+  --border-stronger: oklch(from var(--foreground) l calc(c * .5) h / calc(5% + 45% * var(--contrast-border)));
+  --border-button-hover: var(--border-stronger);
+  --ring: oklch(from var(--primary-bright) l c h / 45%);
+
+  --destructive-solid: oklch(.55 var(--expressive-chroma) var(--destructive-hue));
+  --destructive-solid-hover: oklch(from var(--destructive-solid) calc(l + var(--button-fill-hover-delta) * var(--tone-span) / max(var(--tone-span), calc(var(--tone-span) * -1))) c h);
+  --destructive-foreground: oklch(.98 .005 var(--destructive-hue));
+
+  --warning-solid: oklch(.8 var(--expressive-chroma) var(--warning-hue));
+  --warning-foreground: oklch(from var(--warning-solid) clamp(.12, calc((.62 - l) * 100), .99) calc(c * .08) h);
+
+  --button-shadow-opacity: .08;
+  --button-edge-color: 0deg 0% 0%;
+  --button-shadow-raised: 0 0 0 1px oklch(from var(--foreground) l c h / calc(var(--button-shadow-opacity) * .4)),
+    0 1px 2px oklch(from var(--foreground) l c h / calc(var(--button-shadow-opacity) * .3)),
+    inset 0 .5px 0 hsl(var(--button-edge-color) / calc(.04 * var(--button-edge-strength))),
+    inset 0 -1px 0 oklch(0 0 0 / .03);
+  --button-shadow-pressed: 0 0 0 1px oklch(from var(--foreground) l c h / calc(var(--button-shadow-opacity) * .5)),
+    inset 0 1px 2px oklch(0 0 0 / .05);
+}
+
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 1px;
+}
+
+.heading-meta {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.heading-section {
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}

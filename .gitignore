@@ -1,0 +1,17 @@
+node_modules
+dist
+.next
+.build
+.env
+.env.*
+!.env.example
+.vscode
+*.log
+*.tsbuildinfo
+.cache
+Backend/data/*
+!Backend/data/.gitkeep
+Backend/backups/*
+!Backend/backups/.gitkeep
+Frontend/playwright-report/
+Frontend/test-results/

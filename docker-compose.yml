@@ -1,0 +1,126 @@
+name: astarbase
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ${POSTGRES_CONTAINER:-astarbase-postgres}
+    entrypoint: ["sh", "/usr/local/bin/astarbase-entrypoint.sh"]
+    environment:
+      POSTGRES_DB: ${DB_NAME:?Set DB_NAME in .env or pass --env-file Backend/.env}
+      POSTGRES_USER: ${DB_USER:?Set DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: --auth-local=scram-sha-256 --auth-host=scram-sha-256
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - unix_socket_directories=/var/run/postgresql
+      - -c
+      - unix_socket_permissions=0777
+    ports:
+      - "0.0.0.0:${POSTGRES_PUBLIC_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - postgres-socket:/var/run/postgresql
+      - ./Backend/backups:/var/lib/astarbase/backups
+      # Read-only upgrade source; old archives are copied without deletion.
+      - postgres-backups:/var/lib/astarbase/legacy-backups:ro
+      - ./docker/postgres/entrypoint.sh:/usr/local/bin/astarbase-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h /var/run/postgresql -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    networks: [astarbase]
+
+  pgbouncer:
+    build: ./docker/pgbouncer
+    environment:
+      DB_USER: ${DB_USER:?Set DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    ports:
+      - "0.0.0.0:${PGBOUNCER_PUBLIC_PORT:-6432}:6432"
+    volumes:
+      - postgres-socket:/var/run/postgresql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "6432"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [astarbase]
+
+  studio:
+    build:
+      context: .
+      dockerfile: Backend/dockerfile
+    environment:
+      DB_NAME: ${DB_NAME:?Set DB_NAME}
+      DB_USER: ${DB_USER:?Set DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      LEGACY_CONTROL_DB: ${LEGACY_CONTROL_DB:-${CONTROL_DB:-astarbase_control}}
+      ADMIN_DATA_DIR: /app/Backend/data
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN}
+      AUTO_START_COMPOSE: "false"
+      PORT: "8000"
+      DOCKER_SOCKET: /var/run/docker.sock
+      PG_SOCKET_DIR: /var/run/postgresql
+      POSTGRES_CONTAINER: ${POSTGRES_CONTAINER:-astarbase-postgres}
+      SQL_TIMEOUT_MS: ${SQL_TIMEOUT_MS:-30000}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - postgres-socket:/var/run/postgresql
+      - ./Backend/data:/app/Backend/data
+      - admin-socket:/var/run/astarbase
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+    networks: [astarbase]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Frontend/dockerfile
+    environment:
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN}
+      ADMIN_SOCKET_PATH: /var/run/astarbase/admin.sock
+      STUDIO_COOKIE_SECURE: ${STUDIO_COOKIE_SECURE:-false}
+    volumes:
+      - admin-socket:/var/run/astarbase
+    ports:
+      - "127.0.0.1:${STUDIO_PORT:-5000}:5000"
+    depends_on:
+      studio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/api/session').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+    networks: [astarbase]
+
+networks:
+  astarbase:
+    driver: bridge
+volumes:
+  postgres-data:
+  postgres-socket:
+  postgres-backups:
+  admin-socket:
