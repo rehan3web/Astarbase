@@ -6,8 +6,11 @@ import type { Config } from '../config.js';
 
 export type Branch = {
   name: string; database_name: string; parent_name: string | null;
-  created_at: string; refreshed_at: string | null;
+  created_at: string; refreshed_at: string | null; tag: string | null;
 };
+export const branchTagSchema = z.string().trim().min(1).max(32)
+  .regex(/^[\p{L}\p{N}][\p{L}\p{N} _./-]*$/u, 'Use letters, numbers, spaces, _, -, / or . for tags')
+  .nullable();
 export type Backup = {
   id: string; database_name: string; label: string; size_bytes: number; created_at: string;
 };
@@ -37,7 +40,8 @@ export class AdminStore {
       CREATE TABLE IF NOT EXISTS branches (
         name TEXT PRIMARY KEY, database_name TEXT NOT NULL UNIQUE,
         parent_name TEXT REFERENCES branches(name) ON DELETE RESTRICT,
-        created_at TEXT NOT NULL, refreshed_at TEXT
+        created_at TEXT NOT NULL, refreshed_at TEXT,
+        tag TEXT DEFAULT 'dev' CHECK(tag IS NULL OR (length(tag) BETWEEN 1 AND 32 AND trim(tag) = tag))
       );
       CREATE TABLE IF NOT EXISTS backups (
         id TEXT PRIMARY KEY, database_name TEXT NOT NULL,
@@ -48,12 +52,24 @@ export class AdminStore {
       CREATE TABLE IF NOT EXISTS admin_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS admin_migrations (name TEXT PRIMARY KEY);
     `);
+    // Add metadata in-place for existing installations. Check under the write
+    // lock so concurrent Studio starts cannot both attempt the same ALTER.
+    this.transaction(() => {
+      const columns = this.db.prepare('PRAGMA table_info(branches)').all();
+      if (!columns.some(column => column.name === 'tag')) {
+        this.db.exec(`
+          ALTER TABLE branches ADD COLUMN tag TEXT DEFAULT 'dev'
+            CHECK(tag IS NULL OR (length(tag) BETWEEN 1 AND 32 AND trim(tag) = tag));
+          UPDATE branches SET tag = 'production' WHERE name = 'main';
+        `);
+      }
+    });
     const main = this.db.prepare('SELECT database_name FROM branches WHERE name = ?').get('main');
     if (main && main.database_name !== config.DB_NAME) {
       this.db.close();
       throw new Error('DB_NAME differs from the initialized main database');
     }
-    this.db.prepare('INSERT OR IGNORE INTO branches(name,database_name,parent_name,created_at) VALUES(?,?,NULL,?)')
+    this.db.prepare("INSERT OR IGNORE INTO branches(name,database_name,parent_name,created_at,tag) VALUES(?,?,NULL,?,'production')")
       .run('main', config.DB_NAME, new Date().toISOString());
   }
 
@@ -69,9 +85,13 @@ export class AdminStore {
   hasDatabase(database: string): boolean {
     return Boolean(this.db.prepare('SELECT 1 FROM branches WHERE database_name = ?').get(database));
   }
-  addBranch(name: string, database: string, parent: string) {
-    this.db.prepare('INSERT INTO branches(name,database_name,parent_name,created_at) VALUES(?,?,?,?)')
-      .run(name, database, parent, new Date().toISOString());
+  addBranch(name: string, database: string, parent: string, tag: string | null = 'dev') {
+    this.db.prepare('INSERT INTO branches(name,database_name,parent_name,created_at,tag) VALUES(?,?,?,?,?)')
+      .run(name, database, parent, new Date().toISOString(), branchTagSchema.parse(tag));
+  }
+  updateBranchTag(name: string, tag: string | null): Branch | undefined {
+    this.db.prepare('UPDATE branches SET tag = ? WHERE name = ?').run(branchTagSchema.parse(tag), name);
+    return this.branch(name);
   }
   markRefreshed(name: string) {
     this.db.prepare('UPDATE branches SET refreshed_at = ? WHERE name = ?').run(new Date().toISOString(), name);
@@ -105,7 +125,7 @@ export class AdminStore {
   importedLegacy(): boolean {
     return Boolean(this.db.prepare('SELECT 1 FROM admin_migrations WHERE name = ?').get('legacy-postgres-catalog'));
   }
-  importLegacy(branches: Branch[], backups: Backup[]) {
+  importLegacy(branches: Array<Omit<Branch, 'tag'> & { tag?: string | null }>, backups: Backup[]) {
     this.transaction(() => {
       // Parent rows may arrive after children in an existing catalog.
       this.db.exec('PRAGMA defer_foreign_keys = ON');
@@ -114,8 +134,9 @@ export class AdminStore {
         if (current && (current.database_name !== row.database_name || current.parent_name !== row.parent_name)) {
           throw new Error('Legacy branch metadata conflicts with SQLite; no data was replaced');
         }
-        this.db.prepare('INSERT OR IGNORE INTO branches VALUES(?,?,?,?,?)')
-          .run(row.name, row.database_name, row.parent_name, row.created_at, row.refreshed_at);
+        this.db.prepare('INSERT OR IGNORE INTO branches(name,database_name,parent_name,created_at,refreshed_at,tag) VALUES(?,?,?,?,?,?)')
+          .run(row.name, row.database_name, row.parent_name, row.created_at, row.refreshed_at,
+            branchTagSchema.parse(row.tag === undefined ? row.name === 'main' ? 'production' : 'dev' : row.tag));
       }
       for (const row of backups) {
         this.db.prepare('INSERT OR IGNORE INTO backups VALUES(?,?,?,?,?)')

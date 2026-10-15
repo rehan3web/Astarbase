@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
+import { getTagBadgeStyle, isValidBranchTag } from '@/components/branches/branchTag'
 
 export function BranchesPageView() {
   const { branches, branch: activeBranch, selectBranch, reload } = useStudio()
@@ -41,9 +42,13 @@ export function BranchesPageView() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [targetBranch, setTargetBranch] = useState<(typeof branches)[number] | null>(null)
   const [newBranchName, setNewBranchName] = useState('')
+  const [newBranchTag, setNewBranchTag] = useState('dev')
   const [parentDatabase, setParentDatabase] = useState(activeBranch?.database_name ?? '')
   const [confirmation, setConfirmation] = useState('')
   const [busy, setBusy] = useState(false)
+  const [tagBusy, setTagBusy] = useState(false)
+  const [tagOpen, setTagOpen] = useState(false)
+  const [tagDraft, setTagDraft] = useState('')
   const [error, setError] = useState('')
 
   const closeConfirmation = () => {
@@ -56,16 +61,54 @@ export function BranchesPageView() {
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!newBranchName.trim() || busy) return
+    const tag = newBranchTag.trim()
+    if (!isValidBranchTag(tag)) {
+      const message = 'Use a tag of up to 32 characters, starting with a letter or number.'
+      setError(message); notify(message, 'error'); return
+    }
     setBusy(true); setError('')
     try {
       const name = newBranchName.trim()
       const parent = branches.find(branch => branch.database_name === parentDatabase)
       if (!parent) throw new Error('Select a valid parent database.')
-      await api('/branches', { method: 'POST', body: { name, parent: parent.name } })
+      await api('/branches', { method: 'POST', body: { name, parent: parent.name, tag: tag || null } })
       await reload()
-      setCreateOpen(false); setNewBranchName('')
+      setCreateOpen(false); setNewBranchName(''); setNewBranchTag('dev')
       notify(`Branch "${name}" created`, 'success')
     } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
+  }
+
+  const openTagEditor = (branch: (typeof branches)[number]) => {
+    setTargetBranch(branch)
+    setTagDraft(branch.tag ?? '')
+    setError('')
+    setTagOpen(true)
+  }
+
+  const handleTagSave = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!targetBranch || tagBusy) return
+    const tag = tagDraft.trim()
+    if (!isValidBranchTag(tag)) {
+      const message = 'Use a tag of up to 32 characters, starting with a letter or number.'
+      setError(message); notify(message, 'error'); return
+    }
+    setTagBusy(true); setError('')
+    try {
+      await api(`/branches/${encodeURIComponent(targetBranch.name)}`, {
+        method: 'PATCH',
+        body: { tag: tag || null },
+      })
+      await reload()
+      setTagOpen(false)
+      notify(tag ? 'Branch tag updated' : 'Branch tag removed', 'success')
+    } catch (e) {
+      const message = errorMessage(e)
+      setError(message)
+      notify(message, 'error')
+    } finally {
+      setTagBusy(false)
+    }
   }
 
   const handleRefresh = async (event: React.FormEvent) => {
@@ -118,6 +161,9 @@ export function BranchesPageView() {
           iconLeft={<Plus className="h-3.5 w-3.5" />}
           onClick={() => {
             setParentDatabase(activeBranch?.database_name ?? branches[0]?.database_name ?? '')
+            setNewBranchTag('dev')
+            setNewBranchName('')
+            setError('')
             setCreateOpen(true)
           }}
           className="gap-1.5 font-medium shadow-xs"
@@ -152,7 +198,9 @@ export function BranchesPageView() {
                   <span className="block mt-0.5 text-[10px] text-foreground-muted font-mono truncate">{branch.database_name}{branch.parent_name ? ` · parent ${branch.parent_name}` : ''}</span>
                 </div>
               </div>
-              <span className="text-[10px] text-foreground-muted" title="Branch tags are not returned by the live API">Not exposed</span>
+              <div>
+                {branch.tag && <span className={`text-[10px] uppercase tracking-wider font-medium border rounded-full px-2 py-0.5 ${getTagBadgeStyle(branch.tag)}`}>{branch.tag}</span>}
+              </div>
               <div className="flex items-center gap-1.5 text-sm text-foreground-light" title="Storage usage is not returned by the live API">
                 <HardDrive className="h-3 w-3 text-foreground-muted" />
                 <span className="font-mono text-xs">—</span>
@@ -171,6 +219,9 @@ export function BranchesPageView() {
                   <DropdownMenuContent align="end" className="w-40 bg-surface-100 border-default text-foreground shadow-xl">
                     <DropdownMenuItem className="text-xs gap-2 cursor-pointer" onSelect={() => selectBranch(branch.name)}>
                       <GitBranch className="h-3.5 w-3.5 text-foreground-lighter" />Switch to branch
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-xs gap-2 cursor-pointer" onSelect={() => openTagEditor(branch)}>
+                      <Pencil className="h-3.5 w-3.5 text-foreground-lighter" />Edit tag
                     </DropdownMenuItem>
                     <DropdownMenuItem disabled title="Branch rename is not provided by the connected API." className="text-xs gap-2 opacity-50">
                       <Pencil className="h-3.5 w-3.5 text-foreground-lighter" />Rename unavailable
@@ -213,12 +264,40 @@ export function BranchesPageView() {
                   {branches.map(branch => <option key={branch.name} value={branch.database_name}>{branch.name} · {branch.database_name}</option>)}
                 </select>
               </div>
+              <div className="space-y-1.5">
+                <label htmlFor="branch-new-tag" className="text-xs font-medium text-foreground">Environment tag</label>
+                <Input id="branch-new-tag" aria-label="Environment tag" placeholder="e.g. dev, staging, production" maxLength={32} value={newBranchTag} onChange={event => setNewBranchTag(event.target.value)} disabled={busy} className="bg-surface-200 border-strong text-foreground placeholder:text-foreground-muted text-xs h-9 focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" />
+                <p className="text-[10px] text-foreground-muted">Leave blank to create without a tag.</p>
+              </div>
             </div>
             {error && <p role="alert" className="mb-3 text-xs text-destructive">{error}</p>}
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">
               <button type="button" onClick={() => setCreateOpen(false)} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-foreground-lighter hover:text-foreground hover:bg-surface-200 rounded-md transition-colors">Cancel</button>
               <button type="submit" disabled={!newBranchName.trim() || busy || !parentDatabase} className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-foreground bg-surface-300 hover:bg-surface-200 disabled:opacity-50 disabled:pointer-events-none border border-strong rounded-md transition-colors shadow-xs">
                 {busy ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating...</> : 'Create branch'}
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={tagOpen} onOpenChange={open => { if (!tagBusy) { setTagOpen(open); if (!open) setError('') } }}>
+        <DialogContent className="max-w-md p-6 bg-surface-100 border-default text-foreground shadow-2xl rounded-lg" onEscapeKeyDown={event => tagBusy && event.preventDefault()} onPointerDownOutside={event => tagBusy && event.preventDefault()}>
+          <form onSubmit={handleTagSave}>
+            <DialogHeader className="pb-3 border-b border-default text-left">
+              <DialogTitle className="text-base font-semibold text-foreground flex items-center gap-2"><Pencil className="h-4 w-4 text-foreground-lighter" />Edit branch tag</DialogTitle>
+              <DialogDescription className="text-xs text-foreground-lighter mt-1">Set the environment tag for <span className="font-mono text-foreground">{targetBranch?.name}</span>.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-1.5">
+              <label htmlFor="branch-tag-edit" className="text-xs font-medium text-foreground">Branch tag</label>
+              <Input id="branch-tag-edit" aria-label="Branch tag" placeholder="e.g. dev, staging, production" value={tagDraft} maxLength={32} onChange={event => setTagDraft(event.target.value)} disabled={tagBusy} autoFocus className="bg-surface-200 border-strong text-foreground placeholder:text-foreground-muted text-xs h-9 focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" />
+              <p className="text-[10px] text-foreground-muted">Clear the field and save to remove the tag. Up to 32 characters.</p>
+            </div>
+            {error && <p role="alert" className="mb-3 text-xs text-destructive">{error}</p>}
+            <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setTagOpen(false)} disabled={tagBusy} className="px-3 py-1.5 text-xs font-medium text-foreground-lighter hover:text-foreground hover:bg-surface-200 rounded-md transition-colors">Cancel</button>
+              <button type="submit" aria-label="Save tag" disabled={tagBusy} className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-foreground bg-surface-300 hover:bg-surface-200 disabled:opacity-50 disabled:pointer-events-none border border-strong rounded-md transition-colors shadow-xs">
+                {tagBusy ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Saving...</> : 'Save tag'}
               </button>
             </DialogFooter>
           </form>

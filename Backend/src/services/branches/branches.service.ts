@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { branchTagSchema } from '../../db/admin-store.js';
 import { quoteIdentifier, withDatabase } from '../../db/socket.js';
 import { HttpError } from '../../errors.js';
 import { Catalog } from '../admin/catalog.service.js';
@@ -15,7 +16,13 @@ export class BranchService {
   async dropDatabase(database: string) {
     await this.admin(client => client.query(`DROP DATABASE ${quoteIdentifier(database)} WITH (FORCE)`));
   }
-  async create(name: string, parentName = 'main') {
+  updateTag(name: string, tag: string | null) {
+    const branch = this.catalog.store.updateBranchTag(name, tag);
+    if (!branch) throw new HttpError(404, 'Branch not found');
+    return branch;
+  }
+  async create(name: string, parentName = 'main', tag: string | null = 'dev') {
+    const normalizedTag = branchTagSchema.parse(tag);
     return this.catalog.exclusive(async () => {
       if ((await this.catalog.branches()).some(branch => branch.name === name)) throw new HttpError(409, 'Branch already exists');
       const parent = await this.catalog.branch(parentName);
@@ -27,7 +34,7 @@ export class BranchService {
         await this.createDatabase(database);
         created = true;
         await this.postgres.restore(database, id);
-        this.catalog.store.addBranch(name, database, parentName);
+        this.catalog.store.addBranch(name, database, parentName, normalizedTag);
         return await this.catalog.branch(name);
       } catch (error) {
         if (created) await this.dropDatabase(database);

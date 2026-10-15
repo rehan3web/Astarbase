@@ -8,7 +8,7 @@ import { config } from './helpers.js';
 function fixture() {
   const calls: unknown[][] = [];
   const capture = (name: string, result: unknown) => async (...args: unknown[]) => { calls.push([name, ...args]); return result; };
-  const branch = { name: 'dev', database_name: 'branch_dev', parent_name: 'main' };
+  const branch = { name: 'dev', database_name: 'branch_dev', parent_name: 'main', tag: 'dev' };
   let settings = { projectName: 'Astarbase', defaultRowLimit: 100, theme: 'system' };
   const services = {
     health: capture('health', undefined),
@@ -29,7 +29,14 @@ function fixture() {
       update: capture('update', { id: 2, name: 'edited' }),
       delete: capture('delete', { id: 2 }),
     },
-    branches: { create: capture('createBranch', branch), refresh: capture('refresh', { branch }) },
+    branches: {
+      create: capture('createBranch', branch), refresh: capture('refresh', { branch }),
+      updateTag: async (name: string, tag: string | null) => {
+        calls.push(['updateBranchTag', name, tag]);
+        if (name === 'missing') throw new HttpError(404, 'Branch not found');
+        return { ...branch, name, tag };
+      },
+    },
     backups: {
       list: capture('backups', []), create: capture('createBackup', { id: 'backup-id' }),
       restore: capture('restore', { restored: true }),
@@ -77,7 +84,7 @@ test('table routes list, page, create, edit and delete rows', async () => {
 test('branches support parent selection and explicit refresh confirmation', async () => {
   const { app, auth, calls } = fixture();
   await request(app).post('/api/branches').set(auth).send({ name: 'dev', parent: 'main' }).expect(201);
-  assert.deepEqual(calls.at(-1), ['createBranch', 'dev', 'main']);
+  assert.deepEqual(calls.at(-1), ['createBranch', 'dev', 'main', 'dev']);
   for (const name of ['main', '../bad', 'a'.repeat(49)]) {
     await request(app).post('/api/branches').set(auth).send({ name }).expect(400);
   }
@@ -85,6 +92,31 @@ test('branches support parent selection and explicit refresh confirmation', asyn
   await request(app).post('/api/branches/dev/refresh').set(auth).send({ confirmDatabase: 'test_project' }).expect(400);
   await request(app).post('/api/branches/dev/refresh').set(auth).send({ confirmDatabase: 'branch_dev' }).expect(200);
   assert.deepEqual(calls.at(-1), ['refresh', 'dev']);
+});
+
+test('branch tag endpoints validate create/edit/remove, auth, and unknown branches', async () => {
+  const { app, auth, calls } = fixture();
+  await request(app).get('/api/branches').set(auth).expect(200).expect(res => assert.equal(res.body[0].tag, 'dev'));
+  await request(app).post('/api/branches').set(auth).send({ name: 'qa', tag: ' staging ' }).expect(201);
+  assert.deepEqual(calls.at(-1), ['createBranch', 'qa', 'main', 'staging']);
+  await request(app).post('/api/branches').set(auth).send({ name: 'qa', tag: null }).expect(201);
+  assert.deepEqual(calls.at(-1), ['createBranch', 'qa', 'main', null]);
+  await request(app).patch('/api/branches/dev').send({ tag: 'staging' }).expect(401);
+  await request(app).patch('/api/branches/dev').set(auth).send({ tag: ' staging ' })
+    .expect(200).expect(res => assert.equal(res.body.tag, 'staging'));
+  assert.deepEqual(calls.at(-1), ['updateBranchTag', 'dev', 'staging']);
+  await request(app).patch('/api/branches/main').set(auth).send({ tag: 'production' }).expect(200);
+  await request(app).patch('/api/branches/dev').set(auth).send({ tag: null })
+    .expect(200).expect(res => assert.equal(res.body.tag, null));
+  for (const tag of ['', ' ', 'a'.repeat(33), 'bad\nvalue', '<script>', 42, [], {}]) {
+    const count = calls.length;
+    await request(app).patch('/api/branches/dev').set(auth).send({ tag }).expect(400);
+    await request(app).post('/api/branches').set(auth).send({ name: 'qa', tag }).expect(400);
+    assert.equal(calls.length, count);
+  }
+  await request(app).patch('/api/branches/dev').set(auth).send({}).expect(400);
+  await request(app).patch('/api/branches/dev').set(auth).send({ tag: 'dev', database_name: 'postgres' }).expect(400);
+  await request(app).patch('/api/branches/missing').set(auth).send({ tag: 'dev' }).expect(404);
 });
 
 test('schema and backup endpoints validate creation, listing and restore', async () => {

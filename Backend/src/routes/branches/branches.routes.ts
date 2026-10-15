@@ -7,6 +7,7 @@ export function branchesRoutes(services: Services) {
   const controller = branchesController(services);
   router.get('/', controller.list);
   router.post('/', controller.create);
+  router.patch('/:name', controller.updateTag);
   router.post('/:name/refresh', controller.refresh);
   return router;
 }
