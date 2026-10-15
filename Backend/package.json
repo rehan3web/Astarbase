@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "test:integration": "RUN_SOCKET_INTEGRATION=1 tsx --test test/socket.integration.test.ts",
+    "test:recovery": "RUN_SOCKET_INTEGRATION=1 tsx --test test/password-recovery.integration.test.ts",
     "db:push": "tsx src/db/push.ts",
     "setup": "tsx src/setup.ts"
   },

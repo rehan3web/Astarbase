@@ -78,6 +78,32 @@ Browser → Next.js uses the Studio web session. Next.js → Admin API uses the 
 Admin Unix socket. Admin API → Postgres and Docker use kernel Unix sockets only.
 There are no remote-database, TCP-admin, or mock-data fallbacks.
 
+## Recover a forgotten database password without deleting data
+
+Use this only when the original password is unavailable and startup reports
+Postgres authentication error `28P01`. Set the desired password in your own `.env`
+(`DB_PASSWORD`, at least 16 characters); do not paste it into chat or CLI arguments.
+This changes the existing `DB_USER` role password cluster-wide. Existing external
+clients must update their password. There will be maintenance downtime.
+
+```sh
+git pull origin main
+docker compose build studio
+docker compose stop -t 60 frontend studio pgbouncer postgres
+docker compose run --rm --no-deps studio node dist/src/maintenance/reset-password.js --confirm-user astarbase_admin
+# Only after "Password reset confirmed":
+docker compose up -d --wait
+```
+
+Replace `astarbase_admin` with your configured `DB_USER` if different. With legacy
+`Backend/.env`, pass `--env-file Backend/.env` to every Compose command.
+The recovery command refuses a running Postgres server, reuses the exact same
+Postgres image/data mount, runs standalone maintenance with networking disabled,
+sends SQL only over private stdin, and suppresses raw SQL/Docker logs.
+It does not initialize a new database, delete volumes, create roles, change role
+privileges, or weaken `pg_hba.conf`. If it fails, keep Postgres stopped and inspect
+the stated maintenance error; do not delete lock files or volumes.
+
 ## Verification
 
 ```sh
