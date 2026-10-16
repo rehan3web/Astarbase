@@ -14,10 +14,10 @@ import {
 
 function MetricCard({ title, value, badges }: { title: string; value: React.ReactNode; badges: string[] }) {
   return (
-    <div className="relative flex min-w-0 flex-col rounded-xl border border-default bg-studio p-6 transition-colors hover:border-strong">
+    <div className="relative flex h-fit min-w-0 self-start flex-col rounded-xl border border-default bg-studio p-4 transition-colors hover:border-strong">
       <h3 className="break-words text-base font-semibold leading-tight text-foreground">{title}</h3>
       <p className="mt-1 min-w-0 break-words text-base text-foreground-lighter">{value}</p>
-      <div className="mt-5 flex min-w-0 flex-wrap items-start gap-1.5">
+      <div className="mt-3 flex min-w-0 flex-wrap items-start gap-1.5">
         {badges.map(b => <span key={b} className="inline-flex min-w-0 max-w-full break-words whitespace-normal rounded-md border border-strong px-1.5 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wide text-foreground-light">{b}</span>)}
       </div>
     </div>
@@ -151,7 +151,7 @@ export function ProjectHomeView() {
         <MetricCard
           title="Compute CPU"
           value={latest ? formatMetric(latest.cpuPercent, '%') : loading ? 'Loading…' : 'Unavailable'}
-          badges={['Shared Postgres container', '100% = one core']}
+          badges={['Shared Postgres container']}
         />
         <MetricCard
           title="RAM Usage"

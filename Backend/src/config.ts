@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { z } from 'zod';
 
 export const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,6 +18,11 @@ const schema = z.object({
   DB_NAME: identifier,
   DB_USER: identifier,
   DB_PASSWORD: z.string().min(16).refine(value => !/[\x00-\x1f\x7f]/.test(value), 'Control characters are not allowed'),
+  DATABASE_PUBLIC_HOST: z.string().trim().default('').refine(value => value === '' || isIP(value) > 0 ||
+    (value.length <= 253 && value.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label))),
+  'Use a hostname or IP address without a scheme or port'),
+  POSTGRES_PUBLIC_PORT: z.coerce.number().int().min(1).max(65535).default(5432),
+  PGBOUNCER_PUBLIC_PORT: z.coerce.number().int().min(1).max(65535).default(6432),
   LEGACY_CONTROL_DB: identifier.default('astarbase_control'),
   ADMIN_DATA_DIR: z.string().refine(value => path.isAbsolute(value), 'Use an absolute directory path').default(path.join(backendRoot, 'data')),
   PG_SOCKET_DIR: z.literal('/var/run/postgresql').default('/var/run/postgresql'),

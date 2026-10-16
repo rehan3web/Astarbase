@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict'
+import { expect, type Page } from '@playwright/test'
+import type { Config } from '../../Backend/src/config'
+
+export async function verifyConnectDb(page: Page, url: string, config: Config) {
+  await page.getByRole('link', { name: 'Connect', exact: true }).click()
+  await expect(page).toHaveURL(`${url}/connect`)
+  await expect(page.getByRole('heading', { name: 'ConnectDb', exact: true })).toBeVisible()
+  const editor = page.getByRole('textbox', { name: 'Connection details', exact: true })
+  await expect(editor).toHaveValue(/postgresql:.*\[YOUR-PASSWORD\]/)
+  const response = await page.request.get(`${url}/api/studio/databases/${config.DB_NAME}/connection`)
+  assert.equal(response.status(), 200)
+  assert.match(response.headers()['cache-control'], /no-store/)
+  assert.equal(JSON.stringify(await response.json()).includes(config.DB_PASSWORD), false)
+  const password = page.getByLabel('Database password', { exact: true })
+  await expect(password).toHaveAttribute('type', 'password')
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.getByRole('button', { name: 'Copy displayed text', exact: true }).click()
+  assert.ok((await page.evaluate(() => navigator.clipboard.readText())).includes('[YOUR-PASSWORD]'))
+  await page.getByRole('button', { name: 'Show password', exact: true }).click()
+  await expect(password).toHaveValue(config.DB_PASSWORD)
+  await expect(password).toHaveAttribute('type', 'text')
+  const uri = new URL(await editor.inputValue())
+  assert.equal(decodeURIComponent(uri.password), config.DB_PASSWORD)
+  assert.equal(uri.pathname, `/${config.DB_NAME}`)
+  assert.equal(uri.port, String(config.POSTGRES_PUBLIC_PORT))
+  assert.equal(uri.hostname, new URL(url).hostname)
+  await page.getByRole('button', { name: 'Copy displayed text', exact: true }).click()
+  const copied = new URL(await page.evaluate(() => navigator.clipboard.readText()))
+  assert.equal(decodeURIComponent(copied.password), config.DB_PASSWORD)
+  await page.getByRole('button', { name: 'Hide password', exact: true }).click()
+  await expect(editor).toHaveValue(/\[YOUR-PASSWORD\]/)
+  await page.getByRole('tab', { name: 'Transaction Pooler', exact: true }).click()
+  assert.ok((await editor.inputValue()).includes(`:${config.PGBOUNCER_PUBLIC_PORT}/`))
+  await page.getByRole('button', { name: 'Show password', exact: true }).click()
+  await expect(password).toHaveValue(config.DB_PASSWORD)
+  await page.getByRole('tab', { name: 'PSQL', exact: true }).click()
+  await expect(password).toHaveAttribute('type', 'password')
+  await expect(editor).toHaveValue(/PGPASSWORD=.*\[YOUR-PASSWORD\].*psql/)
+  await page.getByRole('tab', { name: 'Parameters', exact: true }).click()
+  await expect(editor).toHaveValue(/PGHOST=.*\nPGPORT=.*\nPGDATABASE=.*\nPGUSER=.*\nPGPASSWORD=.*\nPGSSLMODE=/)
+  await page.getByRole('button', { name: 'Show password', exact: true }).click()
+  await expect(password).toHaveValue(config.DB_PASSWORD)
+  assert.equal((await editor.inputValue()).includes(config.DB_PASSWORD), true)
+  await page.getByRole('button', { name: 'Hide password', exact: true }).click()
+  const rejected = await page.request.post(`${url}/api/studio/databases/${config.DB_NAME}/connection/reveal`, {
+    headers: { Origin: 'https://not-this-studio.example' }, data: {},
+  })
+  assert.equal(rejected.status(), 403)
+  await page.route('**/connection/reveal', route => route.fulfill({
+    status: 503, contentType: 'application/json', body: '{"error":"Unavailable"}',
+  }))
+  await page.getByRole('button', { name: 'Show password', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Show password', exact: true })).toBeEnabled()
+  await expect(password).toHaveAttribute('type', 'password')
+  await expect(editor).toHaveValue(/\[YOUR-PASSWORD\]/)
+  await page.unroute('**/connection/reveal')
+  await page.route('**/connection', route => route.fulfill({
+    status: 503, contentType: 'application/json', body: '{"error":"Unavailable"}',
+  }))
+  await page.reload()
+  await expect(page.getByText('Connection details are unavailable', { exact: true })).toBeVisible()
+  await page.unroute('**/connection')
+  await page.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect(editor).toHaveValue(/\[YOUR-PASSWORD\]/)
+  console.log('PASS: ConnectDb navigation, four tabs, real connection metadata, protected reveal/hide, safe clipboard and error recovery')
+}

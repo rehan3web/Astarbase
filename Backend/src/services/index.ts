@@ -8,6 +8,7 @@ import { TableService } from './tables/tables.service.js';
 import { SchemaService } from './visualizer/visualizer.service.js';
 import { AuthService } from './auth/auth.service.js';
 import { MetricsService } from './metrics/metrics.service.js';
+import { ConnectionService } from './connection/connection.service.js';
 
 export function createServices(config: Config) {
   const catalog = new Catalog(config);
@@ -16,7 +17,8 @@ export function createServices(config: Config) {
   const tables = new TableService(config);
   const metrics = new MetricsService(config, catalog, postgres);
   return {
-    catalog, postgres, branches, tables, metrics, auth: new AuthService(config, catalog.store),
+    catalog, postgres, branches, tables, metrics, connection: new ConnectionService(config, catalog),
+    auth: new AuthService(config, catalog.store),
     backups: new BackupService(catalog, postgres, branches),
     schema: new SchemaService(tables),
     async health() {

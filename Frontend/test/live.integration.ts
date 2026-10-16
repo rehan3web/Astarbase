@@ -14,6 +14,7 @@ import { createApp, createServices, type Services } from '../../Backend/src/inde
 import { pushDatabase } from '../../Backend/src/db/push'
 import { withDatabase, quoteIdentifier } from '../../Backend/src/db/socket'
 import { startAdminListeners } from '../../Backend/src/services/system/listener.service'
+import { verifyConnectDb } from './connect-db.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
 
@@ -172,6 +173,12 @@ try {
   console.log('PASS: SQL results and actual SQL error rendering')
   await verifyDashboardMetrics(page, url, config, services)
   await snapshot('dashboard-metrics')
+  if (process.env.STUDIO_CONNECT_ONLY === '1') {
+    await verifyConnectDb(page, url, config)
+    await snapshot('connect-db')
+    assert.deepEqual(browserErrors, [])
+    return
+  }
   if (process.env.STUDIO_METRICS_ONLY === '1') {
     assert.deepEqual(browserErrors, [])
     return

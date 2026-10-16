@@ -13,6 +13,7 @@ export async function verifyDashboardMetrics(page: Page, url: string, config: Co
     await expect(page.getByRole('heading', { name: heading, exact: true })).toHaveCount(0)
   }
   await expect(page.getByRole('table')).toHaveCount(0)
+  await expect(page.getByText('100% = one core', { exact: true })).toHaveCount(0)
   for (const name of ['1 hour', '24 hours', '7 days']) {
     await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
   }
@@ -83,10 +84,16 @@ export async function verifyDashboardMetrics(page: Page, url: string, config: Co
   for (const width of [1024, 390]) {
     await page.setViewportSize({ width, height: 960 })
     const card = page.getByRole('heading', { name: 'Compute CPU', exact: true }).locator('..')
-    const badge = card.getByText('100% = one core', { exact: true })
+    const badge = card.getByText('Shared Postgres container', { exact: true })
     const cardBox = await card.boundingBox(), badgeBox = await badge.boundingBox()
     assert.ok(cardBox && badgeBox && badgeBox.x >= cardBox.x && badgeBox.x + badgeBox.width <= cardBox.x + cardBox.width)
     assert.equal(await card.evaluate(el => el.scrollWidth <= el.clientWidth), true)
+    assert.equal(await card.evaluate(el => {
+      const style = getComputedStyle(el)
+      const contentBottom = el.lastElementChild!.getBoundingClientRect().bottom
+      const remaining = el.getBoundingClientRect().bottom - contentBottom
+      return Math.abs(remaining - parseFloat(style.paddingBottom) - parseFloat(style.borderBottomWidth)) <= 1
+    }), true)
     const barBox = await chart.getByRole('img').first().boundingBox()
     const plotBox = await chart.getByRole('img').first().locator('..').boundingBox()
     assert.ok(barBox && plotBox && barBox.width < plotBox.width / 10 && Math.abs(barBox.x - plotBox.x) < 2)

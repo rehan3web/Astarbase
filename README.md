@@ -51,6 +51,27 @@ adds a column each elapsed hour, and rolls at 24 columns. Its start time is
 persisted per database in SQLite, so restarting the app or pruning old readings
 does not reset the chart or insert blank columns before recording began.
 
+### External client connections
+
+The header **Connect** link opens `/connect` with Connection String,
+Transaction Pooler, PSQL, and Parameters tabs for the selected branch.
+Metadata uses the configured database role, branch database name, and public
+Postgres/PgBouncer ports. Set `DATABASE_PUBLIC_HOST` to a public DNS name/IP
+when clients need a different host from the Studio browser address; otherwise
+the page uses the actual browser hostname for this same-machine deployment.
+Compose forwards `POSTGRES_PUBLIC_PORT` and `PGBOUNCER_PUBLIC_PORT` to Studio,
+so custom port mappings appear in the generated client strings.
+
+Passwords are masked by default, never included in metadata reads, and only
+returned by an authenticated, same-origin POST after **Show password** is
+clicked. Hide, tab changes, branch changes, and navigation clear the revealed
+password from the view. Credentials are not saved in SQLite/browser storage.
+Copy uses the currently displayed text; masked copies require a real password.
+Parameters displays shell-compatible `PG*` environment assignments in one
+editor. Default Compose connections do not enable TLS: use a trusted network
+or a secure tunnel. These are external client examples, not an Admin Studio
+TCP connection; admin operations remain on shared kernel Unix sockets.
+
 Backend and PgBouncer startup logic use Node.js 24 + TypeScript. No Python
 interpreter, scripts or dependencies are required by the Docker stack.
 

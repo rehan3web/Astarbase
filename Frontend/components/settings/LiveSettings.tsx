@@ -40,7 +40,7 @@ export function LiveSettings() {
           <div className="mb-4"><h2 className="text-xl font-medium text-foreground mb-1">Database password</h2><p className="text-sm text-foreground-lighter">Used for direct Postgres connections</p></div>
           <div className="border border-default bg-studio rounded-xl overflow-hidden">
             <div className="p-6 flex items-center justify-between gap-5">
-              <div><h3 className="text-sm font-medium text-foreground mb-1">Reset database password</h3><p className="text-sm text-foreground-lighter">The password is never returned by the server. Password rotation is not available through the connected admin API.</p></div>
+              <div><h3 className="text-sm font-medium text-foreground mb-1">Reset database password</h3><p className="text-sm text-foreground-lighter">Use Connect to view connection details and reveal the current password. Password rotation is not available through the connected admin API.</p></div>
               <Button variant="default" disabled title="The connected API has no password-reset action.">Unavailable</Button>
             </div>
           </div>
