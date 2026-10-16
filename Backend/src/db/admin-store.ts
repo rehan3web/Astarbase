@@ -1,4 +1,5 @@
 import { SqlLibraryStore } from './sql-library.js';
+import { MetricsStore } from './metrics-store.js';
 import { DatabaseSync } from 'node:sqlite';
 import { chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -29,6 +30,7 @@ const defaults: AdminSettings = { projectName: 'Astarbase', defaultRowLimit: 100
 export class AdminStore {
   readonly file: string;
   readonly sqlLibrary: SqlLibraryStore;
+  readonly metrics: MetricsStore;
   private db: DatabaseSync;
 
   constructor(config: Config) {
@@ -63,6 +65,7 @@ export class AdminStore {
       );
     `);
     this.sqlLibrary = new SqlLibraryStore(this.db);
+    this.metrics = new MetricsStore(this.db);
     // Add metadata in-place for existing installations. Check under the write
     // lock so concurrent Studio starts cannot both attempt the same ALTER.
     this.transaction(() => {

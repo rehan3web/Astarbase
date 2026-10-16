@@ -19,6 +19,7 @@ async function main() {
     await startupStep('database', () => pushDatabase(config, services.catalog.store));
     const listeners = await startupStep('listeners', () => startAdminListeners(createApp(config, services), config.PORT));
     console.log(`Admin API ready on shared Unix socket; health listener on ${config.PORT}`);
+    services.metrics.start();
     let closing = false;
     for (const signal of ['SIGTERM', 'SIGINT'] as const) {
       process.once(signal, () => {

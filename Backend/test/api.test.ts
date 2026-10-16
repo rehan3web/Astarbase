@@ -12,6 +12,9 @@ function fixture() {
   let settings = { projectName: 'Astarbase', defaultRowLimit: 100, theme: 'system' };
   const services = {
     health: capture('health', undefined),
+    metrics: {
+      track: async <T>(_database: string, _kind: string, work: () => Promise<T>): Promise<T> => work(),
+    },
     catalog: {
       store: {
         settings: () => settings,

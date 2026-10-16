@@ -27,7 +27,8 @@ export function branchesController(services: Services) {
       if (confirmation.parse(req.body).confirmDatabase !== branch.database_name) {
         throw new HttpError(400, 'Confirm the exact database name to replace');
       }
-      res.json(await services.branches.refresh(name));
+      res.json(await services.metrics.track(branch.database_name, 'branch-refresh',
+        () => services.branches.refresh(name)));
     },
   };
 }

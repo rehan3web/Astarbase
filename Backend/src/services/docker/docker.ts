@@ -14,6 +14,12 @@ export class DockerService {
     if (!info.State.Running) throw new Error('Postgres container is not running');
   }
 
+  async stats() {
+    // Separate short timeout: never apply this to long-running dump/restore execs.
+    const client = new Docker({ socketPath: this.config.DOCKER_SOCKET, timeout: 8000 });
+    return client.getContainer(this.config.POSTGRES_CONTAINER).stats({ stream: false });
+  }
+
   async exec(command: string[], timeoutMs = 300000, maxBytes = 8 * 1024 * 1024): Promise<{ stdout: string; stderr: string }> {
     const container = this.docker.getContainer(this.config.POSTGRES_CONTAINER);
     const exec = await container.exec({

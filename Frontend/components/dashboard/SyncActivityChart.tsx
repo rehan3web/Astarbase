@@ -1,270 +1,190 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useTheme } from '@/components/providers/ThemeProvider'
+import type { ActivityTelemetry, ActivityBucket } from '@/lib/dashboard-metrics'
 
-export interface SyncHourData {
-  id: number
-  label?: string
-  fullTime: string
-  succeeded: number
-  slow: number
-  failed: number
+type MetricMode = 'runs' | 'rows'
+const EMPTY_BUCKETS: ActivityBucket[] = []
+
+const runKeys = ['succeeded', 'slow', 'failed'] as const
+const rowKeys = ['inserted', 'updated', 'deleted'] as const
+const colorNames = {
+  succeeded: 'Succeeded',
+  slow: 'Slow',
+  failed: 'Failed',
+  inserted: 'Inserted',
+  updated: 'Updated',
+  deleted: 'Deleted',
+} as const
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value)
 }
 
-// 24-hour exact dataset corresponding to the user's dashboard image
-// Total runs: 727, landed: 99.0%
-const RUNS_DATA: SyncHourData[] = [
-  { id: 0, fullTime: '15:00', succeeded: 34, slow: 0, failed: 0 },
-  { id: 1, fullTime: '16:00', succeeded: 34, slow: 0, failed: 0 },
-  { id: 2, fullTime: '17:00', succeeded: 34, slow: 0, failed: 0 },
-  { id: 3, label: '18:00', fullTime: '18:00', succeeded: 35, slow: 0, failed: 0 },
-  { id: 4, fullTime: '19:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 5, fullTime: '20:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 6, fullTime: '21:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 7, label: '22:00', fullTime: '22:00', succeeded: 29, slow: 0, failed: 1 },
-  { id: 8, fullTime: '23:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 9, fullTime: '00:00', succeeded: 31, slow: 0, failed: 0 },
-  { id: 10, fullTime: '01:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 11, label: '02:00', fullTime: '02:00', succeeded: 27, slow: 4, failed: 0 },
-  { id: 12, fullTime: '03:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 13, fullTime: '04:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 14, fullTime: '05:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 15, label: '06:00', fullTime: '06:00', succeeded: 30, slow: 1, failed: 0 },
-  { id: 16, fullTime: '07:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 17, fullTime: '08:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 18, fullTime: '09:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 19, label: '10:00', fullTime: '10:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 20, fullTime: '11:00', succeeded: 30, slow: 0, failed: 0 },
-  { id: 21, fullTime: '12:00', succeeded: 30, slow: 1, failed: 0 },
-  { id: 22, fullTime: '13:00', succeeded: 26, slow: 0, failed: 4 },
-  { id: 23, label: 'Now', fullTime: '14:00 (Now)', succeeded: 14, slow: 0, failed: 2 },
-]
+function formatTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date)
+}
 
-// Corresponding dataset for the "Rows" toggle
-const ROWS_DATA: SyncHourData[] = [
-  { id: 0, fullTime: '15:00', succeeded: 68, slow: 0, failed: 0 },
-  { id: 1, fullTime: '16:00', succeeded: 67, slow: 0, failed: 0 },
-  { id: 2, fullTime: '17:00', succeeded: 69, slow: 0, failed: 0 },
-  { id: 3, label: '18:00', fullTime: '18:00', succeeded: 72, slow: 0, failed: 0 },
-  { id: 4, fullTime: '19:00', succeeded: 58, slow: 0, failed: 0 },
-  { id: 5, fullTime: '20:00', succeeded: 60, slow: 0, failed: 0 },
-  { id: 6, fullTime: '21:00', succeeded: 59, slow: 0, failed: 0 },
-  { id: 7, label: '22:00', fullTime: '22:00', succeeded: 57, slow: 0, failed: 2 },
-  { id: 8, fullTime: '23:00', succeeded: 61, slow: 0, failed: 0 },
-  { id: 9, fullTime: '00:00', succeeded: 62, slow: 0, failed: 0 },
-  { id: 10, fullTime: '01:00', succeeded: 59, slow: 0, failed: 0 },
-  { id: 11, label: '02:00', fullTime: '02:00', succeeded: 54, slow: 7, failed: 0 },
-  { id: 12, fullTime: '03:00', succeeded: 60, slow: 0, failed: 0 },
-  { id: 13, fullTime: '04:00', succeeded: 59, slow: 0, failed: 0 },
-  { id: 14, fullTime: '05:00', succeeded: 60, slow: 0, failed: 0 },
-  { id: 15, label: '06:00', fullTime: '06:00', succeeded: 61, slow: 2, failed: 0 },
-  { id: 16, fullTime: '07:00', succeeded: 60, slow: 0, failed: 0 },
-  { id: 17, fullTime: '08:00', succeeded: 59, slow: 0, failed: 0 },
-  { id: 18, fullTime: '09:00', succeeded: 60, slow: 0, failed: 0 },
-  { id: 19, label: '10:00', fullTime: '10:00', succeeded: 61, slow: 0, failed: 0 },
-  { id: 20, fullTime: '11:00', succeeded: 60, slow: 0, failed: 0 },
-  { id: 21, fullTime: '12:00', succeeded: 58, slow: 2, failed: 0 },
-  { id: 22, fullTime: '13:00', succeeded: 52, slow: 0, failed: 8 },
-  { id: 23, label: 'Now', fullTime: '14:00 (Now)', succeeded: 28, slow: 0, failed: 4 },
-]
+function bucketTotals(bucket: ActivityBucket, mode: MetricMode): number[] | null {
+  const metrics = mode === 'runs' ? bucket.runs : bucket.rows
+  if (!metrics) return null
+  return mode === 'runs'
+    ? [(metrics as NonNullable<ActivityBucket['runs']>).succeeded, (metrics as NonNullable<ActivityBucket['runs']>).slow, (metrics as NonNullable<ActivityBucket['runs']>).failed]
+    : [(metrics as NonNullable<ActivityBucket['rows']>).inserted, (metrics as NonNullable<ActivityBucket['rows']>).updated, (metrics as NonNullable<ActivityBucket['rows']>).deleted]
+}
 
-export function SyncActivityChart() {
+export function SyncActivityChart({ activity, hours }: { activity: ActivityTelemetry | null; hours: number }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-
-  const [metricMode, setMetricMode] = useState<'runs' | 'rows'>('runs')
+  const [metricMode, setMetricMode] = useState<MetricMode>('runs')
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-
-  const isRuns = metricMode === 'runs'
-  const data = isRuns ? RUNS_DATA : ROWS_DATA
-  const maxValue = isRuns ? 45 : 90
-
-  // Summary statistics
-  const totalRuns = 727
-  const landedRate = '99.0%'
-
-  // Diagonal hatched patterns optimized for both Dark and Light mode
-  // Succeeded: mint green stripes
-  const patternSucceeded = {
-    background: isDark
-      ? 'repeating-linear-gradient(-45deg, #10b981 0px, #10b981 2.5px, rgba(16, 185, 129, 0.25) 2.5px, rgba(16, 185, 129, 0.25) 5.5px)'
-      : 'repeating-linear-gradient(-45deg, #26c281 0px, #26c281 2.5px, #a8ebd0 2.5px, #a8ebd0 5.5px)',
+  const buckets = activity?.buckets ?? EMPTY_BUCKETS
+  const keys = metricMode === 'runs' ? runKeys : rowKeys
+  const totals = useMemo(
+    () => buckets.map(bucket => bucketTotals(bucket, metricMode)),
+    [buckets, metricMode],
+  )
+  const observed = totals.filter((values): values is number[] => values !== null)
+  const totalsByCategory = [0, 1, 2].map(index => observed.reduce((sum, values) => sum + values[index], 0))
+  const grandTotal = totalsByCategory.reduce((sum, value) => sum + value, 0)
+  const peak = Math.max(0, ...observed.map(values => values.reduce((sum, value) => sum + value, 0)))
+  const scaleMax = peak > 0 ? Math.ceil(peak / 5) * 5 : 0
+  const patterns = {
+    succeeded: { background: isDark ? 'repeating-linear-gradient(-45deg, #10b981 0px, #10b981 2.5px, rgba(16, 185, 129, 0.25) 2.5px, rgba(16, 185, 129, 0.25) 5.5px)' : 'repeating-linear-gradient(-45deg, #26c281 0px, #26c281 2.5px, #a8ebd0 2.5px, #a8ebd0 5.5px)' },
+    slow: { background: isDark ? 'repeating-linear-gradient(-45deg, #f59e0b 0px, #f59e0b 2.5px, rgba(245, 158, 11, 0.25) 2.5px, rgba(245, 158, 11, 0.25) 5.5px)' : 'repeating-linear-gradient(-45deg, #f59e0b 0px, #f59e0b 2.5px, #fde68a 2.5px, #fde68a 5.5px)' },
+    failed: { background: isDark ? 'repeating-linear-gradient(-45deg, #ef4444 0px, #ef4444 2.5px, rgba(239, 68, 68, 0.25) 2.5px, rgba(239, 68, 68, 0.25) 5.5px)' : 'repeating-linear-gradient(-45deg, #ef4444 0px, #ef4444 2.5px, #fca5a5 2.5px, #fca5a5 5.5px)' },
   }
-
-  // Slow: golden amber stripes
-  const patternSlow = {
-    background: isDark
-      ? 'repeating-linear-gradient(-45deg, #f59e0b 0px, #f59e0b 2.5px, rgba(245, 158, 11, 0.25) 2.5px, rgba(245, 158, 11, 0.25) 5.5px)'
-      : 'repeating-linear-gradient(-45deg, #f59e0b 0px, #f59e0b 2.5px, #fde68a 2.5px, #fde68a 5.5px)',
-  }
-
-  // Failed: coral red stripes
-  const patternFailed = {
-    background: isDark
-      ? 'repeating-linear-gradient(-45deg, #ef4444 0px, #ef4444 2.5px, rgba(239, 68, 68, 0.25) 2.5px, rgba(239, 68, 68, 0.25) 5.5px)'
-      : 'repeating-linear-gradient(-45deg, #ef4444 0px, #ef4444 2.5px, #fca5a5 2.5px, #fca5a5 5.5px)',
-  }
+  const colors = metricMode === 'runs'
+    ? [patterns.succeeded, patterns.slow, patterns.failed]
+    : [patterns.succeeded, patterns.slow, patterns.failed]
+  const keysForTooltip = metricMode === 'runs' ? runKeys : rowKeys
+  const unit = metricMode === 'runs' ? 'runs' : 'rows'
+  const rangeLabel = `${hours} ${hours === 1 ? 'hour' : 'hours'}`
 
   return (
-    <div className="relative flex flex-col rounded-xl border border-default bg-studio p-6 shadow-xs transition-colors hover:border-strong">
-      {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4">
+    <section className="relative flex flex-col rounded-xl border border-default bg-studio p-6 shadow-xs transition-colors hover:border-strong" aria-labelledby="sync-activity-title">
+      <div className="flex flex-col justify-between gap-4 pb-4 sm:flex-row sm:items-start">
         <div>
-          <h2 className="text-base font-semibold text-foreground tracking-tight leading-tight">
-            Sync Activity
-          </h2>
-          <p className="text-xs text-foreground-lighter mt-1">
-            {isRuns ? `${totalRuns} runs in 24 hours, ${landedRate} landed` : '1.42M rows in 24 hours, 99.4% landed'}
+          <h2 id="sync-activity-title" className="text-base font-semibold leading-tight tracking-tight text-foreground">Sync Activity</h2>
+          <p className="mt-1 text-xs text-foreground-lighter" aria-live="polite">
+            {activity
+              ? `${formatCount(grandTotal)} recorded ${unit} in ${rangeLabel} · ${observed.length} of ${buckets.length} bins observed${metricMode === 'runs' ? ` · Slow ≥ ${formatCount(activity.slowThresholdMs)} ms` : ''}`
+              : `Persisted activity telemetry · ${rangeLabel}`}
           </p>
         </div>
-
-        {/* Legend and Toggle */}
-        <div className="flex flex-wrap items-center gap-4 sm:gap-5 self-start">
-          {/* Legend Items */}
-          <div className="flex items-center gap-3 text-xs text-foreground-lighter">
-            <span className="flex items-center gap-1.5 font-normal">
-              <span className="inline-block h-2 w-2 rounded-full bg-[#10b981]" />
-              Succeeded
-            </span>
-            <span className="flex items-center gap-1.5 font-normal">
-              <span className="inline-block h-2 w-2 rounded-full bg-[#f59e0b]" />
-              Pending
-            </span>
-            <span className="flex items-center gap-1.5 font-normal">
-              <span className="inline-block h-2 w-2 rounded-full bg-[#ef4444]" />
-              Failed
-            </span>
+        <div className="flex flex-wrap items-center gap-4 self-start sm:gap-5">
+          <div className="flex items-center gap-3 text-xs text-foreground-lighter" aria-label={metricMode === 'runs' ? 'Run status legend' : 'Row changes legend'}>
+            {keys.map((key, index) => (
+              <span key={key} className="flex items-center gap-1.5 font-normal">
+                <span className={`inline-block h-2 w-2 rounded-full ${index === 0 ? 'bg-[#10b981]' : index === 1 ? 'bg-[#f59e0b]' : 'bg-[#ef4444]'}`} />
+                {colorNames[key]}
+              </span>
+            ))}
           </div>
-
-          {/* Runs / Rows Toggle */}
-          <div className="flex items-center rounded-lg border border-default bg-surface-100 p-0.5">
-            <button
-              type="button"
-              onClick={() => setMetricMode('runs')}
-              className={`rounded-md px-2.5 py-1 text-xs transition-all ${
-                isRuns
-                  ? 'bg-studio font-medium text-foreground shadow-xs border border-strong'
-                  : 'font-normal text-foreground-lighter hover:text-foreground'
-              }`}
-            >
-              Runs
-            </button>
-            <button
-              type="button"
-              onClick={() => setMetricMode('rows')}
-              className={`rounded-md px-2.5 py-1 text-xs transition-all ${
-                !isRuns
-                  ? 'bg-studio font-medium text-foreground shadow-xs border border-strong'
-                  : 'font-normal text-foreground-lighter hover:text-foreground'
-              }`}
-            >
-              Rows
-            </button>
+          <div className="flex items-center rounded-lg border border-default bg-surface-100 p-0.5" role="group" aria-label="Activity metric">
+            {(['runs', 'rows'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                aria-label={`Show ${mode === 'runs' ? 'run activity' : 'row changes'}`}
+                aria-pressed={metricMode === mode}
+                onClick={() => setMetricMode(mode)}
+                className={`rounded-md px-2.5 py-1 text-xs transition-colors ${metricMode === mode ? 'border border-strong bg-studio font-medium text-foreground shadow-xs' : 'font-normal text-foreground-lighter hover:text-foreground'}`}
+              >
+                {mode === 'runs' ? 'Runs' : 'Rows'}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Chart Canvas */}
-      <div className="relative pt-4">
-        {/* Main Chart Area */}
-        <div className="w-full flex items-end gap-1.5 sm:gap-2 md:gap-2.5 h-44 sm:h-48 md:h-52 relative">
-            {data.map((item, index) => {
-              const total = item.succeeded + item.slow + item.failed
-              const totalPercent = Math.min(100, Math.max(0, (total / maxValue) * 100))
-              const succeededPercent = total > 0 ? (item.succeeded / total) * 100 : 0
-              const slowPercent = total > 0 ? (item.slow / total) * 100 : 0
-              const failedPercent = total > 0 ? (item.failed / total) * 100 : 0
-
-              const isHovered = hoveredIndex === index
-
-              return (
-                <div
-                  key={item.id}
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                  className="flex-1 h-full relative flex flex-col justify-end items-center group cursor-pointer"
-                >
-                  {/* Floating Tooltip */}
-                  {isHovered && (
-                    <div className="absolute -top-14 z-30 pointer-events-none rounded-lg border border-strong bg-surface-100 px-2.5 py-1.5 text-[11px] font-sans text-foreground shadow-lg whitespace-nowrap transition-opacity">
-                      <div className="font-semibold">{item.fullTime}</div>
-                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-foreground-lighter">
-                        <span className="text-[#10b981] font-medium">Succeeded: {item.succeeded}</span>
-                        {item.slow > 0 && <span className="text-[#f59e0b] font-medium">Slow: {item.slow}</span>}
-                        {item.failed > 0 && <span className="text-[#ef4444] font-medium">Failed: {item.failed}</span>}
+      {!activity ? (
+        <div className="flex h-52 items-end gap-2 pt-4" aria-label="Activity chart loading">
+          {Array.from({ length: 24 }, (_, index) => <div key={index} className="h-full flex-1 animate-pulse rounded-md bg-surface-200" />)}
+        </div>
+      ) : buckets.length === 0 ? (
+        <div className="flex h-52 items-center justify-center rounded-lg border border-dashed border-strong text-sm text-foreground-lighter">
+          No activity bins were returned for this range.
+        </div>
+      ) : (
+        <>
+          <div className="relative pt-4">
+            <div className="relative flex h-44 w-full items-end gap-1.5 sm:h-48 sm:gap-2 md:h-52 md:gap-2.5" role="group" aria-label={`${metricMode === 'runs' ? 'Run' : 'Row change'} activity, ${rangeLabel}`}>
+              {buckets.map((bucket, index) => {
+                const values = totals[index]
+                const total = values?.reduce((sum, value) => sum + value, 0) ?? 0
+                const height = values && total > 0 && scaleMax > 0 ? Math.min(100, total / scaleMax * 100) : 0
+                const isHovered = hoveredIndex === index
+                const time = `${formatTime(bucket.startAt)}–${formatTime(bucket.endAt)}`
+                const accessibleSummary = values === null
+                  ? `${time}: No recorded observations`
+                  : `${time}: ${keysForTooltip.map((key, valueIndex) => `${colorNames[key]} ${formatCount(values[valueIndex])}`).join(', ')}`
+                return (
+                  <div
+                    key={`${bucket.startAt}-${index}`}
+                    className="group relative flex h-full flex-1 cursor-default flex-col items-center justify-end"
+                    role="img"
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    onFocus={() => setHoveredIndex(index)}
+                    onBlur={() => setHoveredIndex(null)}
+                    tabIndex={0}
+                    aria-label={accessibleSummary}
+                  >
+                    {isHovered && (
+                      <div role="tooltip" className="pointer-events-none absolute -top-[4.5rem] z-30 max-w-[min(24rem,90vw)] rounded-lg border border-strong bg-surface-100 px-2.5 py-1.5 text-[11px] text-foreground shadow-lg">
+                        <div className="font-semibold">{time}</div>
+                        {values === null ? (
+                          <div className="mt-0.5 text-[10px] text-foreground-lighter">No recorded observations</div>
+                        ) : (
+                          <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-foreground-lighter">
+                            {keysForTooltip.map((key, valueIndex) => (
+                              <span key={key} className={valueIndex === 0 ? 'font-medium text-[#10b981]' : valueIndex === 1 ? 'font-medium text-[#f59e0b]' : 'font-medium text-[#ef4444]'}>
+                                {colorNames[key]}: {formatCount(values[valueIndex])}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Column Pill: Full Height Track */}
-                  <div className="relative w-full h-full flex flex-col justify-end">
-                    {/* Background Soft Track (Theme Adapted) */}
-                    <div
-                      className={`absolute inset-0 rounded-md bg-surface-200 transition-colors ${
-                        isHovered ? 'bg-surface-300' : ''
-                      }`}
-                    />
-
-                    {/* Colored Stacked Bar with Hatched Pattern */}
-                    <div
-                      className="relative w-full rounded-md overflow-hidden flex flex-col justify-end shadow-2xs transition-all duration-300"
-                      style={{ height: `${totalPercent}%` }}
-                    >
-                      {/* Failed Segment (Top) */}
-                      {item.failed > 0 && (
-                        <div
-                          style={{
-                            height: `${failedPercent}%`,
-                            ...patternFailed,
-                          }}
-                          className="w-full shrink-0"
-                        />
-                      )}
-
-                      {/* Slow Segment (Middle) */}
-                      {item.slow > 0 && (
-                        <div
-                          style={{
-                            height: `${slowPercent}%`,
-                            ...patternSlow,
-                          }}
-                          className="w-full shrink-0"
-                        />
-                      )}
-
-                      {/* Succeeded Segment (Bottom) */}
-                      {item.succeeded > 0 && (
-                        <div
-                          style={{
-                            height: `${succeededPercent}%`,
-                            ...patternSucceeded,
-                          }}
-                          className="w-full shrink-0"
-                        />
+                    )}
+                    <div className="relative flex h-full w-full flex-col justify-end">
+                      <div className={`absolute inset-0 rounded-md bg-surface-200 transition-colors ${isHovered ? 'bg-surface-300' : ''}`} />
+                      {values !== null && total > 0 && (
+                        <div className="relative flex w-full shrink-0 flex-col justify-end overflow-hidden rounded-md shadow-2xs transition-[height] duration-300" style={{ height: `${height}%` }}>
+                          {values.map((value, valueIndex) => value > 0 ? (
+                            <div key={keysForTooltip[valueIndex]} className="w-full shrink-0" style={{ height: `${value / total * 100}%`, ...colors[valueIndex] }} />
+                          ) : null).reverse()}
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-              )
-            })}
-        </div>
-
-        {/* X-Axis Labels Row */}
-        <div className="w-full flex items-center gap-1.5 sm:gap-2 md:gap-2.5 pt-2">
-          {data.map((item) => (
-            <div key={item.id} className="flex-1 text-center">
-              {item.label ? (
-                <span className="text-[11px] sm:text-xs text-foreground-lighter font-sans select-none block truncate">
-                  {item.label}
-                </span>
-              ) : (
-                <span className="invisible text-[11px] select-none block">&nbsp;</span>
-              )}
+                )
+              })}
             </div>
-          ))}
-        </div>
-      </div>
-    </div>
+            <div className="flex w-full items-center gap-1.5 pt-2 sm:gap-2 md:gap-2.5" aria-hidden="true">
+              {buckets.map((bucket, index) => {
+                const showLabel = index === 0 || index === buckets.length - 1 || index % Math.max(1, Math.floor(buckets.length / 4)) === 0
+                return (
+                  <div key={`${bucket.startAt}-label`} className="flex-1 text-center">
+                    {showLabel
+                      ? <span className="block truncate font-sans text-[10px] text-foreground-lighter sm:text-[11px]">{index === buckets.length - 1 ? 'Now' : formatTime(bucket.startAt)}</span>
+                      : <span className="invisible block text-[10px]">&nbsp;</span>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          {observed.length < buckets.length && (
+            <p className="mt-2 text-[11px] text-foreground-muted">{buckets.length - observed.length} bin{buckets.length - observed.length === 1 ? '' : 's'} have no recorded {metricMode === 'runs' ? 'run' : 'row-change'} observations; gaps are intentionally left empty.</p>
+          )}
+        </>
+      )}
+      {activity && observed.length > 0 && grandTotal === 0 && (
+        <p className="mt-2 text-[11px] text-foreground-muted">Observed bins contain zero {unit}; zero values are shown without a bar.</p>
+      )}
+    </section>
   )
 }

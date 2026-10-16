@@ -12,6 +12,39 @@ queries outside the folder. Private and Shared are authenticated Studio library
 groups for this single-admin installation; Shared never means anonymous access.
 Saving a snippet does not execute it; use **Run** separately.
 
+### Dashboard metrics and retained history
+
+Database size, selected-database connections and transaction/row-change activity
+come from PostgreSQL over its shared Unix socket. CPU and working-set RAM come
+from the **Postgres container**, using dockerode over `/var/run/docker.sock`;
+these are shared across all branches, not per-branch CPU/RAM or whole-VPS usage.
+Docker CPU uses counter deltas; 100% means one CPU core, so values can exceed 100%.
+Connection limits are cluster-wide. Memory usage excludes inactive file cache.
+
+The backend samples managed databases every 30 seconds even with the dashboard
+closed. Numeric readings and query/branch-refresh event metadata persist in
+`Backend/data/admin.sqlite` for 7 days, including across container restarts.
+The dashboard offers 1h/24h/7d history and periodic refresh. Time buckets select
+actual samples; gaps are never filled with invented data. Transaction rates
+require two samples and reset their baseline when Postgres counters reset or a
+database is recreated. Transactions are not SQL statement counts.
+
+`GET /api/databases/:database/metrics?hours=24&limit=240` is authenticated.
+`hours` accepts 1–168 and `limit` 1–720. Errors mark partial/stale readings rather
+than producing fake zeros; old readings remain available within retention.
+Activity events store only kind, time, duration and success/error—not SQL text,
+credentials or query results. Saving an editor snippet is not a query event.
+Metrics from before this feature was installed cannot be reconstructed.
+
+The activity chart retains the original backup UI's striped stacked bars,
+hover details and Runs/Rows switch. Runs aggregate all recorded Studio SQL and
+branch-refresh events in the selected period (not just the latest event list):
+successful operations under 1 second, slow successful operations, and failures.
+Rows show observed insert/update/delete counter deltas, assigned to the bucket
+in which each sample interval ends. Counter resets, recreated databases, missing
+baselines and sampling gaps over 90 seconds are not treated as valid row activity.
+Unobserved buckets remain empty rather than displaying fabricated activity.
+
 Backend and PgBouncer startup logic use Node.js 24 + TypeScript. No Python
 interpreter, scripts or dependencies are required by the Docker stack.
 

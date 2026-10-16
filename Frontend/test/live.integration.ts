@@ -15,6 +15,7 @@ import { pushDatabase } from '../../Backend/src/db/push'
 import { withDatabase, quoteIdentifier } from '../../Backend/src/db/socket'
 import { startAdminListeners } from '../../Backend/src/services/system/listener.service'
 import { verifySqlLibrary } from './sql-library.browser'
+import { verifyDashboardMetrics } from './dashboard-metrics.browser'
 
 async function main() {
 const run = promisify(execFile)
@@ -169,6 +170,13 @@ try {
   await page.getByTitle('Run query (Ctrl+Enter)').click()
   await expectToast(/no_such_table.*does not exist/, true)
   console.log('PASS: SQL results and actual SQL error rendering')
+  await verifyDashboardMetrics(page, url, config, services)
+  await snapshot('dashboard-metrics')
+  if (process.env.STUDIO_METRICS_ONLY === '1') {
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+  await page.goto(`${url}/sql`)
   await verifySqlLibrary(page, url, setQuery)
   await snapshot('sql-library')
   if (process.env.STUDIO_SQL_LIBRARY_ONLY === '1') {

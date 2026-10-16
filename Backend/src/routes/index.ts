@@ -7,6 +7,7 @@ import { visualizerRoutes } from './visualizer/visualizer.routes.js';
 import { backupsRoutes } from './backups/backups.routes.js';
 import { settingsRoutes } from './settings/settings.routes.js';
 import { authRoutes } from './auth/auth.routes.js';
+import { metricsRoutes } from './metrics/metrics.routes.js';
 
 export function apiRoutes(services: Services) {
   const router = Router();
@@ -15,6 +16,7 @@ export function apiRoutes(services: Services) {
   router.use('/databases', databaseRoutes(services));
   router.use('/databases/:database/tables', tablesRoutes(services));
   router.use('/databases/:database/schema', visualizerRoutes(services));
+  router.use('/databases/:database/metrics', metricsRoutes(services));
   router.use('/branches', branchesRoutes(services));
   router.use('/backups', backupsRoutes(services));
   router.use('/settings', settingsRoutes(services));
