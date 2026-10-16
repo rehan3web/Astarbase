@@ -36,7 +36,7 @@ function bucketTotals(bucket: ActivityBucket, mode: MetricMode): number[] | null
     : [(metrics as NonNullable<ActivityBucket['rows']>).inserted, (metrics as NonNullable<ActivityBucket['rows']>).updated, (metrics as NonNullable<ActivityBucket['rows']>).deleted]
 }
 
-export function SyncActivityChart({ activity, hours }: { activity: ActivityTelemetry | null; hours: number }) {
+export function SyncActivityChart({ activity }: { activity: ActivityTelemetry | null }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [metricMode, setMetricMode] = useState<MetricMode>('runs')
@@ -62,7 +62,7 @@ export function SyncActivityChart({ activity, hours }: { activity: ActivityTelem
     : [patterns.succeeded, patterns.slow, patterns.failed]
   const keysForTooltip = metricMode === 'runs' ? runKeys : rowKeys
   const unit = metricMode === 'runs' ? 'runs' : 'rows'
-  const rangeLabel = `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+  const rangeLabel = '24 hours'
 
   return (
     <section className="relative flex flex-col rounded-xl border border-default bg-studio p-6 shadow-xs transition-colors hover:border-strong" aria-labelledby="sync-activity-title">
@@ -102,17 +102,17 @@ export function SyncActivityChart({ activity, hours }: { activity: ActivityTelem
       </div>
 
       {!activity ? (
-        <div className="flex h-52 items-end gap-2 pt-4" aria-label="Activity chart loading">
-          {Array.from({ length: 24 }, (_, index) => <div key={index} className="h-full flex-1 animate-pulse rounded-md bg-surface-200" />)}
+        <div className="grid h-52 grid-cols-[repeat(24,minmax(0,1fr))] items-end gap-1.5 pt-4 sm:gap-2 md:gap-2.5" aria-label="Activity chart loading">
+          <div className="col-start-1 h-full animate-pulse rounded-md bg-surface-200" />
         </div>
       ) : buckets.length === 0 ? (
         <div className="flex h-52 items-center justify-center rounded-lg border border-dashed border-strong text-sm text-foreground-lighter">
-          No activity bins were returned for this range.
+          No elapsed activity bins yet.
         </div>
       ) : (
         <>
           <div className="relative pt-4">
-            <div className="relative flex h-44 w-full items-end gap-1.5 sm:h-48 sm:gap-2 md:h-52 md:gap-2.5" role="group" aria-label={`${metricMode === 'runs' ? 'Run' : 'Row change'} activity, ${rangeLabel}`}>
+            <div className="relative grid h-44 w-full grid-cols-[repeat(24,minmax(0,1fr))] items-end gap-1.5 sm:h-48 sm:gap-2 md:h-52 md:gap-2.5" role="group" aria-label={`${metricMode === 'runs' ? 'Run' : 'Row change'} activity, ${rangeLabel}`}>
               {buckets.map((bucket, index) => {
                 const values = totals[index]
                 const total = values?.reduce((sum, value) => sum + value, 0) ?? 0
@@ -125,7 +125,7 @@ export function SyncActivityChart({ activity, hours }: { activity: ActivityTelem
                 return (
                   <div
                     key={`${bucket.startAt}-${index}`}
-                    className="group relative flex h-full flex-1 cursor-default flex-col items-center justify-end"
+                    className="group relative flex h-full w-full cursor-default flex-col items-center justify-end"
                     role="img"
                     onMouseEnter={() => setHoveredIndex(index)}
                     onMouseLeave={() => setHoveredIndex(null)}
@@ -164,14 +164,17 @@ export function SyncActivityChart({ activity, hours }: { activity: ActivityTelem
                 )
               })}
             </div>
-            <div className="flex w-full items-center gap-1.5 pt-2 sm:gap-2 md:gap-2.5" aria-hidden="true">
+            <div className="grid w-full grid-cols-[repeat(24,minmax(0,1fr))] gap-1.5 pt-2 sm:gap-2 md:gap-2.5" aria-hidden="true">
               {buckets.map((bucket, index) => {
-                const showLabel = index === 0 || index === buckets.length - 1 || index % Math.max(1, Math.floor(buckets.length / 4)) === 0
+                const onlyOneBin = buckets.length === 1
+                const showLabel = onlyOneBin
+                  ? index === 0
+                  : index === 0 || index === buckets.length - 1 || index % Math.max(1, Math.floor(buckets.length / 4)) === 0
                 return (
-                  <div key={`${bucket.startAt}-label`} className="flex-1 text-center">
+                  <div key={`${bucket.startAt}-label`} className="w-full text-center">
                     {showLabel
-                      ? <span className="block truncate font-sans text-[10px] text-foreground-lighter sm:text-[11px]">{index === buckets.length - 1 ? 'Now' : formatTime(bucket.startAt)}</span>
-                      : <span className="invisible block text-[10px]">&nbsp;</span>}
+                      ? <span className="block truncate font-sans text-[10px] text-foreground-lighter sm:text-[11px]">{!onlyOneBin && index === buckets.length - 1 ? 'Now' : formatTime(bucket.startAt)}</span>
+                      : null}
                   </div>
                 )
               })}

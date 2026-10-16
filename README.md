@@ -44,6 +44,12 @@ Rows show observed insert/update/delete counter deltas, assigned to the bucket
 in which each sample interval ends. Counter resets, recreated databases, missing
 baselines and sampling gaps over 90 seconds are not treated as valid row activity.
 Unobserved buckets remain empty rather than displaying fabricated activity.
+The dashboard does not display the detailed telemetry tables or range controls;
+readings and activity remain available in the API and retained in SQLite.
+The chart starts with one left-aligned hourly column at the first recording,
+adds a column each elapsed hour, and rolls at 24 columns. Its start time is
+persisted per database in SQLite, so restarting the app or pruning old readings
+does not reset the chart or insert blank columns before recording began.
 
 Backend and PgBouncer startup logic use Node.js 24 + TypeScript. No Python
 interpreter, scripts or dependencies are required by the Docker stack.

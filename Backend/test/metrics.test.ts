@@ -52,7 +52,7 @@ test('metrics API is protected, validates ranges, coalesces reads, and persists 
   assert.equal(result.body.latest.cpuPercent, 125);
   assert.equal(result.body.latest.transactionsPerSecond, null);
   assert.equal(result.body.latest.connections, 3);
-  assert.equal(result.body.activity.buckets.length, 24);
+  assert.equal(result.body.activity.buckets.length, 1);
   assert.equal(result.body.activity.buckets.every((bucket: { runs: unknown; rows: unknown }) => bucket.runs === null && bucket.rows === null), true);
   f.advance();
   f.database({ commits: 157, rollbacks: 5, rowsInserted: 70 });

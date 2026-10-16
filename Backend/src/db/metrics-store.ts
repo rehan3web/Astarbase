@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { ActivityEvent, ActivityKind, MetricSample } from '../services/metrics/types.js';
-import { buildActivity, SLOW_OPERATION_MS, type ActivityRow, type RunBucket } from '../services/metrics/activity.js';
+import { activityWindow, buildActivity, SLOW_OPERATION_MS, type ActivityRow, type RunBucket } from '../services/metrics/activity.js';
 
 export const METRICS_RETENTION_DAYS = 7;
 export class MetricsStore {
@@ -21,10 +21,30 @@ export class MetricsStore {
       CREATE INDEX IF NOT EXISTS metric_samples_time ON metric_samples(sampled_at);
       CREATE INDEX IF NOT EXISTS metric_events_time ON metric_events(occurred_at);
     `);
+    if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='metric_origins'").get()) {
+      // One-time backfill preserves the first recording when upgrading an existing installation.
+      db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS metric_origins(database_name TEXT PRIMARY KEY,started_at INTEGER NOT NULL);
+        INSERT INTO metric_origins(database_name,started_at)
+          SELECT database_name,MIN(recorded_at) FROM (
+            SELECT database_name,sampled_at AS recorded_at FROM metric_samples
+            UNION ALL SELECT database_name,occurred_at AS recorded_at FROM metric_events
+          ) GROUP BY database_name
+          ON CONFLICT(database_name) DO UPDATE SET started_at=MIN(metric_origins.started_at,excluded.started_at);
+        COMMIT;
+      `);
+    }
+  }
+  private rememberStart(database: string, at: number) {
+    this.db.prepare(`INSERT INTO metric_origins(database_name,started_at) VALUES(?,?)
+      ON CONFLICT(database_name) DO UPDATE SET started_at=MIN(metric_origins.started_at,excluded.started_at)`)
+      .run(database, at);
   }
   save(sample: MetricSample) {
     this.db.prepare('INSERT OR REPLACE INTO metric_samples(database_name,sampled_at,data) VALUES(?,?,?)')
       .run(sample.database, Date.parse(sample.sampledAt), JSON.stringify(sample));
+    this.rememberStart(sample.database, Date.parse(sample.sampledAt));
   }
   latest(database: string): MetricSample | null {
     const row = this.db.prepare('SELECT data FROM metric_samples WHERE database_name=? ORDER BY sampled_at DESC LIMIT 1').get(database);
@@ -47,6 +67,7 @@ export class MetricsStore {
   event(database: string, kind: ActivityKind, status: 'success' | 'error', durationMs: number, now: number) {
     this.db.prepare('INSERT INTO metric_events(database_name,occurred_at,kind,status,duration_ms) VALUES(?,?,?,?,?)')
       .run(database, now, kind, status, Math.max(0, Math.round(durationMs)));
+    this.rememberStart(database, now);
   }
   events(database: string, hours: number, now: number): ActivityEvent[] {
     return this.db.prepare(`
@@ -58,7 +79,9 @@ export class MetricsStore {
     }) as ActivityEvent);
   }
   activity(database: string, hours: number, now: number) {
-    const since = now - hours * 3600000, width = hours * 3600000 / 24;
+    const origin = this.db.prepare('SELECT started_at FROM metric_origins WHERE database_name=?').get(database);
+    const firstRecordedAt = origin ? Number(origin.started_at) : null;
+    const { start: since, width } = activityWindow(hours, now, firstRecordedAt);
     // Aggregate the full persisted event window, not just the recent 30-event list.
     const runs = this.db.prepare(`
       SELECT MIN(23,CAST((occurred_at-?)/? AS INTEGER)) AS bucket,
@@ -78,7 +101,7 @@ export class MetricsStore {
       FROM metric_samples WHERE database_name=? AND sampled_at>=? AND sampled_at<=?
       ORDER BY sampled_at
     `).all(database, since, now) as ActivityRow[];
-    return buildActivity(rows, runs, hours, now);
+    return buildActivity(rows, runs, hours, now, firstRecordedAt);
   }
   prune(now: number) {
     const cutoff = now - METRICS_RETENTION_DAYS * 86400000;
