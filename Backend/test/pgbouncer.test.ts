@@ -20,10 +20,28 @@ test('TypeScript PgBouncer configuration preserves wildcard Unix routing and pri
     assert.match(config, /^auth_type = scram-sha-256$/m);
     assert.match(config, /^listen_addr = 0.0.0.0$/m);
     assert.match(config, /^listen_port = 6432$/m);
+    assert.match(config, /^max_client_conn = 200$/m);
+    assert.match(config, /^auth_user = test_admin$/m);
+    assert.match(config, /^auth_dbname = postgres$/m);
+    assert.match(config, /^auth_query = SELECT usename, passwd FROM astarbase_pool_auth.lookup\(\$1\)$/m);
+    assert.match(config, /^reserve_pool_size = 0$/m);
     assert.equal(config.includes(fixture.DB_PASSWORD), false);
     assert.equal(await readFile(path.join(dir, 'users.txt'), 'utf8'), `"test_admin" "${fixture.DB_PASSWORD.replaceAll('"', '""')}"\n`);
     assert.equal((await stat(dir)).mode & 0o777, 0o700);
     for (const name of ['users.txt', 'pgbouncer.ini']) assert.equal((await stat(path.join(dir, name))).mode & 0o777, 0o600);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('pool size survives container startup and invalid persisted sizes fail explicitly', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'astarbase-pool-size-'));
+  try {
+    await writeFile(path.join(dir, 'pool-size'), '35');
+    const file = await writePoolConfig(dir, fixture);
+    assert.match(await readFile(file, 'utf8'), /^default_pool_size = 35$/m);
+    for (const value of ['0', '81', 'bad']) {
+      await writeFile(path.join(dir, 'pool-size'), value);
+      await assert.rejects(writePoolConfig(dir, fixture), /Invalid saved pool size/);
+    }
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

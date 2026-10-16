@@ -7,5 +7,8 @@ export function connectionRoutes(services: Services) {
   const controller = connectionController(services);
   router.get('/', controller.get);
   router.post('/reveal', controller.reveal);
+  router.post('/reset', controller.reset);
+  router.get('/pool', controller.pool);
+  router.patch('/pool', controller.updatePool);
   return router;
 }

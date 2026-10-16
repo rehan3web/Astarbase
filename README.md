@@ -55,7 +55,7 @@ does not reset the chart or insert blank columns before recording began.
 
 The header **Connect** link opens `/connect` with Connection String,
 Transaction Pooler, PSQL, and Parameters tabs for the selected branch.
-Metadata uses the configured database role, branch database name, and public
+Metadata uses the selected database's separate client role, branch database name, and public
 Postgres/PgBouncer ports. Set `DATABASE_PUBLIC_HOST` to a public DNS name/IP
 when clients need a different host from the Studio browser address; otherwise
 the page uses the actual browser hostname for this same-machine deployment.
@@ -74,6 +74,47 @@ Parameters displays shell-compatible `PG*` environment assignments in one
 editor. Default Compose connections do not enable TLS: use a trusted network
 or a secure tunnel. These are external client examples, not an Admin Studio
 TCP connection; admin operations remain on shared kernel Unix sockets.
+
+### Database credentials and pool settings
+
+Studio preferences are no longer shown in Database Settings. Each new branch,
+including a child branch, gets a non-superuser login with the branch name and a
+cryptographically random password. Main uses the separate `astarbase_main`
+client login. Internal admin operations keep using `DB_USER` / `DB_PASSWORD`;
+Settings never rotates that internal credential.
+
+On upgrade, Studio provisions separate credentials for existing managed
+databases without deleting data. Existing privileged `DB_USER` credentials
+are not revoked: migrate external applications to the new Connect snippets.
+Managed databases have public CONNECT revoked so a branch client cannot connect
+to another managed database. Branch refresh/backup restore strips source ACLs
+and reapplies the destination client's access; its password stays unchanged.
+Existing roles with conflicting names are rejected, never adopted or reset.
+
+In Settings, **Reset database password** rotates only the selected database's
+client password after confirming its exact database name. Get the replacement
+password using **Connect → Show password** and update external clients.
+Already-authenticated sessions can remain connected. PgBouncer uses a restricted
+Postgres SCRAM authentication query, so new branch users and password changes
+do not require editing a user list or restarting the pooler.
+
+Client credentials are encrypted with AES-256-GCM in private files under
+`Backend/data`, not in SQLite or browser storage. Back up the encrypted files
+**and** their `client-credentials.key` together, securely; losing them prevents
+Studio from recovering client passwords. Filesystem access to both can decrypt
+the passwords. Preserve the existing admin-data directory when upgrading.
+
+Only main displays the shared PgBouncer pool settings. Pool size accepts 1–80
+server connections per user/database pair and reloads dynamically. It persists
+in the `pooler-config` Docker volume across restarts. PgBouncer caps each
+database/user at 80 server connections; overall Postgres capacity still applies.
+**Max client connections is fixed at 200 across the entire pooler**, not 200
+per branch, and is not writable through the API.
+
+Upgrade all images together with `docker compose up -d --build` using your
+existing `.env` and volumes. Do not use `down -v`. This upgrade requires a
+privileged existing internal `DB_USER` to manage roles and the private pooler
+authentication function; no new privileged admin roles are created.
 
 Backend and PgBouncer startup logic use Node.js 24 + TypeScript. No Python
 interpreter, scripts or dependencies are required by the Docker stack.

@@ -4,9 +4,10 @@ import { quoteIdentifier, withDatabase } from '../../db/socket.js';
 import { HttpError } from '../../errors.js';
 import { Catalog } from '../admin/catalog.service.js';
 import { PostgresContainer } from '../docker/postgres.js';
+import type { ClientRolesService } from '../connection/client-roles.service.js';
 
 export class BranchService {
-  constructor(readonly catalog: Catalog, readonly postgres: PostgresContainer) {}
+  constructor(readonly catalog: Catalog, readonly postgres: PostgresContainer, readonly roles?: ClientRolesService) {}
   async list() {
     const branches = await this.catalog.branches();
     const sizes = await this.admin(client => client.query<{ datname: string; storage_bytes: string }>(
@@ -43,6 +44,7 @@ export class BranchService {
         await this.createDatabase(database);
         created = true;
         await this.postgres.restore(database, id);
+        if (this.roles) await this.roles.provision(database, name);
         this.catalog.store.addBranch(name, database, parentName, normalizedTag);
         return await this.catalog.branch(name);
       } catch (error) {
@@ -60,6 +62,14 @@ export class BranchService {
     let swapped = false;
     try {
       await this.postgres.restore(staging, dumpId);
+      if (this.roles) {
+        const credential = await this.roles.get(database);
+        await this.admin(async client => {
+          await client.query(`REVOKE CONNECT ON DATABASE ${quoteIdentifier(staging)} FROM PUBLIC`);
+          await client.query(`GRANT CONNECT, TEMPORARY ON DATABASE ${quoteIdentifier(staging)} TO ${quoteIdentifier(credential.user)}`);
+        });
+        await this.roles.grantAccess(staging, credential.user);
+      }
       await this.admin(async client => {
         await client.query(`ALTER DATABASE ${quoteIdentifier(database)} ALLOW_CONNECTIONS false`);
         try {

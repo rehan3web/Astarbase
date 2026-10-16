@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -19,6 +19,7 @@ import { pipeline } from 'node:stream/promises';
 import { spawn } from 'node:child_process';
 import { TableService } from '../src/services/tables/tables.service.js';
 import { SchemaService } from '../src/services/visualizer/visualizer.service.js';
+import { ClientRolesService } from '../src/services/connection/client-roles.service.js';
 
 const run = promisify(execFile);
 test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and backup restore', {
@@ -70,7 +71,14 @@ test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and
     };
     const postgres = new PostgresContainer(config, docker);
     catalog = new Catalog(config);
-    const branches = new BranchService(catalog, postgres);
+    await withDatabase(config, 'postgres', client =>
+      client.query(`ALTER ROLE ${quoteIdentifier(config.DB_USER)} PASSWORD '${config.DB_PASSWORD}'`));
+    // The cluster is disposable and Unix-only. Exercise real SCRAM, not trust auth.
+    await writeFile(path.join(data, 'pg_hba.conf'), 'local all all scram-sha-256\n');
+    await run('pg_ctl', ['-D', data, 'reload']);
+    const roles = new ClientRolesService(config, catalog);
+    await roles.initialize();
+    const branches = new BranchService(catalog, postgres, roles);
     const backups = new BackupService(catalog, postgres, branches);
     const tables = new TableService(config);
     const schema = new SchemaService(tables);
@@ -190,6 +198,37 @@ test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and
         await assert.rejects(branches.refresh('dev'), /injected restore failure/);
         assert.equal((await tables.rows('branch_dev', 'public', 'items', 10, 0)).rows[0].name, 'parent-new');
       } finally { postgres.restore = original; }
+    });
+
+    await t.test('SCRAM client roles isolate main, branch and child; password reset is branch-local', async () => {
+      const main = await roles.get(config.DB_NAME);
+      const dev = await roles.get('branch_dev');
+      const nested = await roles.get('branch_nested');
+      const connect = async (database: string, credential: { user: string; password: string }) => {
+        const pg = await import('pg');
+        const client = new pg.default.Client({ host: socket, database, ...credential });
+        try { await client.connect(); return await client.query('SELECT current_user'); }
+        finally { await client.end(); }
+      };
+      assert.equal((await connect('branch_dev', dev)).rows[0].current_user, 'dev');
+      assert.equal((await connect('branch_nested', nested)).rows[0].current_user, 'nested');
+      assert.equal((await connect(config.DB_NAME, main)).rows[0].current_user, 'astarbase_main');
+      await assert.rejects(connect(config.DB_NAME, dev), /permission denied/);
+      await assert.rejects(connect('branch_nested', dev), /permission denied/);
+      await roles.reset('branch_dev');
+      await assert.rejects(connect('branch_dev', dev), /password authentication failed/);
+      const next = await roles.get('branch_dev');
+      assert.equal((await connect('branch_dev', next)).rows[0].current_user, 'dev');
+      assert.deepEqual(await roles.get(config.DB_NAME), main);
+      assert.deepEqual(await roles.get('branch_nested'), nested);
+      await roles.initialize();
+      assert.deepEqual(await roles.get('branch_dev'), next);
+      const lookup = await withDatabase(config, 'postgres', client =>
+        client.query('SELECT * FROM astarbase_pool_auth.lookup($1)', ['dev']));
+      assert.match(lookup.rows[0].passwd, /^SCRAM-SHA-256\$/);
+      const adminLookup = await withDatabase(config, 'postgres', client =>
+        client.query('SELECT * FROM astarbase_pool_auth.lookup($1)', [config.DB_USER]));
+      assert.equal(adminLookup.rowCount, 0);
     });
 
     await t.test('backup files are listed via container adapter and restored atomically', async () => {

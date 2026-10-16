@@ -60,6 +60,7 @@ export class PostgresContainer {
   async restore(database: string, id: string): Promise<void> {
     await this.docker.exec(['pg_restore', '--host', this.config.PG_SOCKET_DIR, '--username', this.config.DB_USER,
       '--no-password', '--exit-on-error', '--single-transaction', '--no-owner',
+      '--no-privileges',
       '--dbname', database, this.file(id)], 3600000);
   }
 

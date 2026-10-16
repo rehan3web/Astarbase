@@ -43,6 +43,7 @@ services:
       - "0.0.0.0:${PGBOUNCER_PUBLIC_PORT:-6432}:6432"
     volumes:
       - postgres-socket:/var/run/postgresql
+      - pooler-config:/etc/pgbouncer
     depends_on:
       postgres:
         condition: service_healthy
@@ -131,3 +132,4 @@ volumes:
   postgres-socket:
   postgres-backups:
   admin-socket:
+  pooler-config:

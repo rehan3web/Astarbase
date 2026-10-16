@@ -17,6 +17,7 @@ async function main() {
     await startupStep('admin-login', () => services.auth.initialize());
     await startupStep('docker', () => services.postgres.docker.ready());
     await startupStep('database', () => pushDatabase(config, services.catalog.store));
+    await startupStep('database', () => services.clientRoles.initialize());
     const listeners = await startupStep('listeners', () => startAdminListeners(createApp(config, services), config.PORT));
     console.log(`Admin API ready on shared Unix socket; health listener on ${config.PORT}`);
     services.metrics.start();

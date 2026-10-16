@@ -15,6 +15,10 @@ test('connection metadata and explicit password reveal require admin auth and ma
   const services = createServices(options);
   t.after(() => { services.close(); rmSync(dir, { recursive: true, force: true }); });
   services.catalog.store.addBranch('dev', 'branch_dev', 'main');
+  const mainCredential = { user: 'astarbase_main', password: 'main-client-fixture-password' };
+  const branchCredential = { user: 'dev', password: 'branch-client-fixture-password' };
+  await services.clientRoles.credentials.set(config.DB_NAME, mainCredential);
+  await services.clientRoles.credentials.set('branch_dev', branchCredential);
   const app = createApp(options, services), auth = { Authorization: `Bearer ${config.ADMIN_API_TOKEN}` };
   const url = `/api/databases/${config.DB_NAME}/connection`;
   await request(app).get(url).expect(401);
@@ -23,14 +27,32 @@ test('connection metadata and explicit password reveal require admin auth and ma
   await request(app).post(url + '/reveal').set(auth).send({ unexpected: true }).expect(400);
   const metadata = await request(app).get(url).set(auth).expect(200);
   assert.match(metadata.headers['cache-control'], /no-store/);
-  assert.deepEqual(metadata.body, { database: config.DB_NAME, user: config.DB_USER,
+  assert.deepEqual(metadata.body, { database: config.DB_NAME, user: mainCredential.user,
     host: 'db.example.com', directPort: 15432, poolerPort: 16432, sslMode: 'disable' });
   assert.equal(JSON.stringify(metadata.body).includes(config.DB_PASSWORD), false);
   const revealed = await request(app).post(url + '/reveal').set(auth).send({}).expect(200);
   assert.match(revealed.headers['cache-control'], /no-store/);
-  assert.deepEqual(revealed.body, { password: config.DB_PASSWORD });
+  assert.deepEqual(revealed.body, { password: mainCredential.password });
   const branch = await request(app).get('/api/databases/branch_dev/connection').set(auth).expect(200);
   assert.equal(branch.body.database, 'branch_dev');
+  assert.equal(branch.body.user, 'dev');
+  const branchPassword = await request(app).post('/api/databases/branch_dev/connection/reveal').set(auth).send({}).expect(200);
+  assert.equal(branchPassword.body.password, branchCredential.password);
+  await request(app).post(url + '/reset').send({ confirmDatabase: config.DB_NAME }).expect(401);
+  await request(app).post(url + '/reset').set(auth).send({ confirmDatabase: 'wrong' }).expect(400);
+  await request(app).post(url + '/reset').set(auth).send({ confirmDatabase: config.DB_NAME, password: 'custom' }).expect(400);
+  let rotatedDatabase = '';
+  services.clientRoles.reset = async database => { rotatedDatabase = database; return { user: 'dev', rotated: true }; };
+  const rotated = await request(app).post('/api/databases/branch_dev/connection/reset').set(auth)
+    .send({ confirmDatabase: 'branch_dev' }).expect(200);
+  assert.equal(rotatedDatabase, 'branch_dev');
+  assert.equal(rotated.body.rotated, true);
+  assert.match(rotated.headers['cache-control'], /no-store/);
+  await request(app).get('/api/databases/branch_dev/connection/pool').set(auth).expect(403);
+  await request(app).patch(url + '/pool').set(auth).send({ poolSize: 20, maxClientConnections: 300 }).expect(400);
+  for (const poolSize of [0, 81, 1.5, '20']) {
+    await request(app).patch(url + '/pool').set(auth).send({ poolSize }).expect(400);
+  }
   await request(app).get('/api/databases/postgres/connection').set(auth).expect(404);
   await request(app).post('/api/databases/not_managed/connection/reveal').set(auth).send({}).expect(404);
   assert.equal(JSON.stringify(services.catalog.store.settings()).includes(config.DB_PASSWORD), false);

@@ -20,5 +20,23 @@ export function connectionController(services: Services) {
       headers(res);
       res.json(await services.connection.reveal(database));
     },
+    async reset(req: Request, res: Response) {
+      const database = dbName.parse(req.params.database);
+      const body = z.object({ confirmDatabase: dbName }).strict().parse(req.body);
+      if (body.confirmDatabase !== database) {
+        res.status(400).json({ error: 'Confirm the exact database name' }); return;
+      }
+      headers(res);
+      res.json(await services.clientRoles.reset(database));
+    },
+    async pool(req: Request, res: Response) {
+      headers(res);
+      res.json(await services.pooler.get(dbName.parse(req.params.database)));
+    },
+    async updatePool(req: Request, res: Response) {
+      const body = z.object({ poolSize: z.number().int().min(1).max(80) }).strict().parse(req.body);
+      headers(res);
+      res.json(await services.pooler.update(dbName.parse(req.params.database), body.poolSize));
+    },
   };
 }

@@ -88,8 +88,13 @@ export function ConnectDbView() {
   }, [cancelSensitiveActions, database])
 
   useEffect(() => {
+    const changed = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === database) void loadMetadata()
+    }
+    window.addEventListener('studio-credentials-changed', changed)
     void loadMetadata()
     return () => {
+      window.removeEventListener('studio-credentials-changed', changed)
       requestSequence.current += 1
       revealSequence.current += 1
       revealController.current?.abort()
