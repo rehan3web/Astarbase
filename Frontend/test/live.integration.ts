@@ -21,6 +21,7 @@ import { verifyStorageAndBackups } from './backups.browser'
 import { pipeline } from 'node:stream/promises'
 import { verifyVisualizerCopy } from './visualizer-copy.browser'
 import { verifySqlExecutionFeedback } from './sql-results.browser'
+import { verifyDatabaseMaintenance } from './database-maintenance.browser'
 
 async function main() {
 const run = promisify(execFile)
@@ -254,6 +255,7 @@ try {
       await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
       assert.deepEqual(await services.clientRoles.get(database), after)
     }
+    await verifyDatabaseMaintenance(page, url, services, config, snapshot)
     await page.setViewportSize({ width: 390, height: 844 })
     await snapshot('mobile-database-settings')
     assert.deepEqual(browserErrors, [])

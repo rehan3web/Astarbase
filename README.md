@@ -84,8 +84,23 @@ client login. Internal admin operations keep using `DB_USER` / `DB_PASSWORD`;
 Settings never rotates that internal credential.
 
 On upgrade, Studio provisions separate credentials for existing managed
-databases without deleting data. Existing privileged `DB_USER` credentials
-are not revoked: migrate external applications to the new Connect snippets.
+databases without deleting data. **The internal `DB_USER` role is Unix-only**:
+both public Postgres and PgBouncer reject it over IPv4 and IPv6, including the
+public PgBouncer admin console. Studio can still manage main, branches and
+children through the shared Unix socket; PgBouncer can still use its internal
+Unix authentication and console connections. The internal password is not
+rotated by a client password reset.
+
+**Upgrade:** migrate external applications using `DB_USER` to their database's
+new Connect snippet, then run `docker compose up -d --build` from the project
+directory. The updated Postgres mount/configuration and rebuilt PgBouncer apply
+the policy to both new and existing volumes. Recreating these containers
+disconnects existing sessions. Do not remove volumes or change `.env`
+credentials just to apply this policy. Until this update is installed on the
+VPS, an older installation can still accept the old public admin login.
+The Postgres guard includes the original `pg_hba.conf` after the admin-specific
+rules, preserving client rules and relative includes without rewriting that file.
+
 Managed databases have public CONNECT revoked so a branch client cannot connect
 to another managed database. Branch refresh/backup restore strips source ACLs
 and reapplies the destination client's access; its password stays unchanged.
@@ -113,6 +128,31 @@ in the `pooler-config` Docker volume across restarts. PgBouncer caps each
 database/user at 80 server connections; overall Postgres capacity still applies.
 **Max client connections is fixed at 200 across the entire pooler**, not 200
 per branch, and is not writable through the API.
+
+### Reset a database or terminate its client connections
+
+Database Settings shows **Additional → Terminate connections** above Danger Zone,
+and **Reset database** instead of database deletion. Both actions open a warning
+dialog and require explicit confirmation. They apply to the selected main,
+branch or child database only.
+
+**Reset database** permanently clears all application schemas/data, including
+custom tables, functions, extensions and large objects, by swapping in an empty
+`template0` database. It does not pull data from a parent. Existing sessions to the
+selected database must reconnect. Its name, branch metadata, client login/password
+and saved backup archives remain; other databases are untouched. Create a backup
+first if the data must be recoverable. If staging fails, the original stays in place.
+
+**Terminate connections** closes that database's PgBouncer client/server sessions
+and direct TCP Postgres client sessions, rolling back their active transactions.
+It preserves direct Unix admin sessions, background workers and connections to
+other databases. Clients can reconnect automatically with unchanged credentials.
+PgBouncer is resumed after maintenance, including after failed reset/termination.
+
+The pooler admin console is accessed only through its container's Unix socket,
+using the existing internal admin login. Rebuild the PgBouncer image alongside
+Studio on upgrade so the admin-console allowlist is present. A pooler-control
+failure returns an error rather than pretending all connections were terminated.
 
 Upgrade all images together with `docker compose up -d --build` using your
 existing `.env` and volumes. Do not use `down -v`. This upgrade requires a

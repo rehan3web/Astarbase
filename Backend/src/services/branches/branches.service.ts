@@ -54,14 +54,15 @@ export class BranchService {
     });
   }
   // Populate staging first; failed restores leave the original untouched.
-  async replace(database: string, dumpId: string) {
+  async replace(database: string, dumpId: string | null) {
     const suffix = randomUUID().replaceAll('-', '');
     const staging = `studio_stage_${suffix}`;
     const old = `studio_old_${suffix}`;
     await this.createDatabase(staging);
     let swapped = false;
     try {
-      await this.postgres.restore(staging, dumpId);
+      // null intentionally means a fresh template0 database, not a parent copy.
+      if (dumpId !== null) await this.postgres.restore(staging, dumpId);
       if (this.roles) {
         const credential = await this.roles.get(database);
         await this.admin(async client => {

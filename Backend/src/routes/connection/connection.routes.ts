@@ -10,5 +10,7 @@ export function connectionRoutes(services: Services) {
   router.post('/reset', controller.reset);
   router.get('/pool', controller.pool);
   router.patch('/pool', controller.updatePool);
+  router.post('/reset-database', controller.resetDatabase);
+  router.post('/terminate', controller.terminate);
   return router;
 }

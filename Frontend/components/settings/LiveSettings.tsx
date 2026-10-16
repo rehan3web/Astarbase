@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
+import { DatabaseMaintenance } from './DatabaseMaintenance'
 
 type PoolSettings = { poolSize: number; maxClientConnections: number }
 
@@ -115,12 +116,7 @@ function DatabaseSettings({ database, main }: { database: string; main: boolean 
           </form>
         </section>}
 
-        <section>
-          <div className="mb-4"><h2 className="text-xl font-medium text-red-500 mb-1">Danger Zone</h2><p className="text-sm text-foreground-lighter">Destructive actions for this database</p></div>
-          <div className="border border-red-500/30 bg-red-500/5 rounded-xl overflow-hidden">
-            <div className="p-6 flex items-center justify-between gap-5"><div><h3 className="text-sm font-medium text-foreground mb-1">Delete database</h3><p className="text-sm text-foreground-lighter">Permanently deleting this database is not supported by the connected admin API.</p></div><Button variant="default" disabled className="bg-red-500/20 text-foreground-muted border-none" title="No database-deletion endpoint is available.">Unavailable</Button></div>
-          </div>
-        </section>
+        <DatabaseMaintenance database={database} />
       </div>
       <Dialog open={resetOpen} onOpenChange={open => { if (!resetting) { if (open) setResetOpen(true); else closeReset() } }}>
         <DialogContent className="max-w-xl">

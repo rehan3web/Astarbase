@@ -2,6 +2,7 @@ import type { Config } from '../../config.js';
 import { HttpError } from '../../errors.js';
 import type { Catalog } from '../admin/catalog.service.js';
 import type { DockerService } from '../docker/docker.js';
+import { quoteIdentifier } from '../../db/socket.js';
 
 /** PgBouncer is discovered on the same Compose project, never on a remote Docker host. */
 export class PoolerService {
@@ -58,5 +59,40 @@ export class PoolerService {
       await container.kill({ signal: 'SIGHUP' });
       return { poolSize, maxClientConnections: 200 };
     });
+  }
+  private async control(database: string, action: 'KILL' | 'RESUME') {
+    // The admin console is reached inside its container over /tmp's Unix socket.
+    // psql receives its password from the container environment, never argv/logs.
+    await this.execute(`import {spawnSync} from 'node:child_process';
+      function query(sql) {
+        const result=spawnSync('psql',['-X','--no-password','--host','/tmp','--port','6432',
+          '--username',process.env.DB_USER,'--dbname','pgbouncer','--tuples-only',
+          '--no-align','--field-separator','\\t','--set','ON_ERROR_STOP=1','--command',sql],
+          {env:{...process.env,PGPASSWORD:process.env.DB_PASSWORD},encoding:'utf8',timeout:15000,maxBuffer:1048576});
+        if(result.error || result.status!==0) process.exit(1);
+        return result.stdout;
+      }
+      const names=query('SHOW DATABASES').trim().split('\\n').map(line=>line.split('\\t')[0]);
+      if(names.includes(${JSON.stringify(database)})) query(${JSON.stringify(`${action} ${quoteIdentifier(database)}`)});
+    `);
+  }
+  async withDisconnected<T>(database: string, operation: () => Promise<T>): Promise<T> {
+    await this.catalog.assertDatabase(database);
+    let completed = false;
+    try {
+      // KILL disconnects both pooled clients and their server sockets, then pauses
+      // only this database. Inactive wildcard entries need no disconnect.
+      await this.control(database, 'KILL');
+      const result = await operation();
+      completed = true;
+      return result;
+    } finally {
+      try { await this.control(database, 'RESUME'); }
+      catch {
+        throw new HttpError(503, completed ?
+          'Operation completed, but PgBouncer could not resume this database. Resume it before retrying; do not repeat a completed reset.' :
+          'Maintenance failed and PgBouncer could not resume this database. Check the pooler before retrying.');
+      }
+    }
   }
 }

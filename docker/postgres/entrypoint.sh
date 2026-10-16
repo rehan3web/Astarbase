@@ -17,4 +17,18 @@ for archive in /var/lib/astarbase/legacy-backups/*.dump; do
 done
 chown postgres:postgres /var/lib/astarbase/backups
 chmod 700 /var/lib/astarbase/backups
+case "${1:-}" in
+  postgres|-*)
+    # Applies on first initialization AND upgrades of an existing volume.
+    # The official entrypoint creates PGDATA/pg_hba.conf before its temp server
+    # starts. Including it preserves client rules and relative HBA includes.
+    policy=/var/lib/astarbase/pg_hba.conf
+    sh /usr/local/bin/astarbase-network-policy.sh "$POSTGRES_USER" \
+      "${PGDATA:-/var/lib/postgresql/data}" > "$policy.tmp"
+    chown postgres:postgres "$policy.tmp"
+    chmod 600 "$policy.tmp"
+    mv -f "$policy.tmp" "$policy"
+    set -- "$@" -c "hba_file=$policy"
+    ;;
+esac
 exec /usr/local/bin/docker-entrypoint.sh "$@"

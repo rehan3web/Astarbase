@@ -26,6 +26,7 @@ services:
       # Read-only upgrade source; old archives are copied without deletion.
       - postgres-backups:/var/lib/astarbase/legacy-backups:ro
       - ./docker/postgres/entrypoint.sh:/usr/local/bin/astarbase-entrypoint.sh:ro
+      - ./docker/postgres/network-policy.sh:/usr/local/bin/astarbase-network-policy.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h /var/run/postgresql -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s

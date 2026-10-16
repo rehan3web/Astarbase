@@ -7,7 +7,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Config } from '../src/config.js';
 import { config as fixture } from './helpers.js';
-import { withDatabase, quoteIdentifier } from '../src/db/socket.js';
+import { withDatabase, quoteIdentifier, connection } from '../src/db/socket.js';
+import pg from 'pg';
+import { DatabaseMaintenanceService } from '../src/services/connection/maintenance.service.js';
 import { pushDatabase } from '../src/db/push.js';
 import { DockerService } from '../src/services/docker/docker.js';
 import { PostgresContainer } from '../src/services/docker/postgres.js';
@@ -20,6 +22,7 @@ import { spawn } from 'node:child_process';
 import { TableService } from '../src/services/tables/tables.service.js';
 import { SchemaService } from '../src/services/visualizer/visualizer.service.js';
 import { ClientRolesService } from '../src/services/connection/client-roles.service.js';
+import { verifyPoolerNetwork } from './pooler-network.integration.js';
 
 const run = promisify(execFile);
 test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and backup restore', {
@@ -37,9 +40,16 @@ test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and
   // Only this isolated test overrides the two fixed production socket paths.
   const config = { ...fixture, PG_SOCKET_DIR: socket, BACKUP_DIR: backupsDir, ADMIN_DATA_DIR: path.join(dir, 'admin') } as Config;
   try {
-    await run('initdb', ['-D', data, '-U', config.DB_USER, '-A', 'trust', '--no-locale']);
+    const passwordFile = path.join(dir, 'initial-password');
+    await writeFile(passwordFile, config.DB_PASSWORD, { mode: 0o600 });
+    await run('initdb', ['-D', data, '-U', config.DB_USER, '-A', 'scram-sha-256', '--pwfile', passwordFile, '--no-locale']);
+    const policyFile = path.join(dir, 'pg_hba.conf');
+    const { stdout: policy } = await run('sh', [
+      path.resolve('../docker/postgres/network-policy.sh'), config.DB_USER, data,
+    ]);
+    await writeFile(policyFile, policy, { mode: 0o600 });
     await run('pg_ctl', ['-D', data, '-l', path.join(dir, 'postgres.log'),
-      '-o', `-k ${socket} -h '' -p 5432`, '-w', 'start']);
+      '-o', `-k ${socket} -h 127.0.0.1 -p 5432 -c hba_file=${policyFile}`, '-w', 'start']);
     started = true;
     await withDatabase(config, 'postgres', client => client.query(`CREATE DATABASE ${quoteIdentifier(config.DB_NAME)}`));
     await pushDatabase(config);
@@ -73,8 +83,9 @@ test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and
     catalog = new Catalog(config);
     await withDatabase(config, 'postgres', client =>
       client.query(`ALTER ROLE ${quoteIdentifier(config.DB_USER)} PASSWORD '${config.DB_PASSWORD}'`));
-    // The cluster is disposable and Unix-only. Exercise real SCRAM, not trust auth.
-    await writeFile(path.join(data, 'pg_hba.conf'), 'local all all scram-sha-256\n');
+    // All admin operations use Unix sockets. Loopback TCP is only for testing
+    // external client termination; it is never an admin transport fallback.
+    await writeFile(path.join(data, 'pg_hba.conf'), 'local all all scram-sha-256\nhost all all 127.0.0.1/32 scram-sha-256\n');
     await run('pg_ctl', ['-D', data, 'reload']);
     const roles = new ClientRolesService(config, catalog);
     await roles.initialize();
@@ -268,6 +279,87 @@ test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and
       await assert.rejects(backups.download(backup.id, new PassThrough()), /not found/);
       await assert.rejects(backups.delete(backup.id), /not found/);
       await assert.rejects(catalog!.assertDatabase(config.LEGACY_CONTROL_DB), /not found/);
+    });
+
+    await t.test('public Postgres rejects the internal admin on every database; Unix administration and client logins work', async t => {
+      for (const database of [config.DB_NAME, 'branch_dev', 'branch_nested', 'postgres']) {
+        const admin = new pg.Client({ host: '127.0.0.1', database, user: config.DB_USER, password: config.DB_PASSWORD });
+        try { await assert.rejects(admin.connect(), /pg_hba.conf rejects connection/); }
+        finally { await admin.end(); }
+        assert.equal((await withDatabase(config, database, c => c.query('SELECT current_user'))).rows[0].current_user, config.DB_USER);
+        if (database === 'postgres') continue;
+        const client = new pg.Client({ host: '127.0.0.1', database, ...await roles.get(database) });
+        try {
+          await client.connect();
+          assert.equal((await client.query('SELECT current_user')).rows[0].current_user, (await roles.get(database)).user);
+        } finally { await client.end(); }
+      }
+      const parsed = await withDatabase(config, 'postgres', c => c.query('SELECT error FROM pg_hba_file_rules WHERE error IS NOT NULL'));
+      assert.equal(parsed.rowCount, 0);
+      await verifyPoolerNetwork(t, config, dir, roles, branches);
+    });
+
+    const poolActions: string[] = [];
+    const pooler = { async withDisconnected<T>(database: string, operation: () => Promise<T>) {
+      poolActions.push(`kill:${database}`);
+      try { return await operation(); } finally { poolActions.push(`resume:${database}`); }
+    } };
+    const maintenance = new DatabaseMaintenanceService(config, catalog, branches, pooler);
+
+    await t.test('termination closes selected direct TCP clients but preserves Unix admin and other databases', async () => {
+      const target = new pg.Client({ host: '127.0.0.1', port: 5432, database: 'branch_dev', ...await roles.get('branch_dev') });
+      const other = new pg.Client({ host: '127.0.0.1', port: 5432, database: 'branch_nested', ...await roles.get('branch_nested') });
+      const admin = new pg.Client(connection(config, 'branch_dev'));
+      const expectedDisconnects: Error[] = [];
+      target.on('error', error => expectedDisconnects.push(error));
+      await Promise.all([target.connect(), other.connect(), admin.connect()]);
+      try {
+        const pid = (await admin.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        await target.query('BEGIN');
+        await target.query("INSERT INTO items(tenant_id,id,name) VALUES(1,999,'uncommitted')");
+        const result = await maintenance.terminate('branch_dev');
+        assert.equal(result.directConnections, 1);
+        assert.equal(result.unixAdminPreserved, true);
+        assert.equal((await admin.query('SELECT pg_backend_pid() AS pid')).rows[0].pid, pid);
+        assert.equal((await admin.query('SELECT count(*)::int AS count FROM items WHERE id=999')).rows[0].count, 0);
+        assert.equal((await other.query('SELECT current_user')).rows[0].current_user, 'nested');
+        assert.ok(expectedDisconnects.length > 0);
+      } finally { await Promise.all([target.end(), other.end(), admin.end()]); }
+    });
+
+    await t.test('main, branch and child reset to empty without changing other databases, passwords or backups', async () => {
+      const credentials = new Map(await Promise.all([config.DB_NAME, 'branch_dev', 'branch_nested'].map(async database =>
+        [database, await roles.get(database)] as const)));
+      const backup = await backups.create('branch_nested', 'Preserved through reset');
+      for (const database of [config.DB_NAME, 'branch_dev', 'branch_nested']) {
+        const inventory = catalog!.store.branches();
+        await postgres.query(database, 'CREATE SCHEMA reset_extra; CREATE TABLE reset_extra.data(id int); CREATE FUNCTION reset_extra.answer() RETURNS int LANGUAGE sql AS $$ SELECT 42 $$;');
+        const others = [config.DB_NAME, 'branch_dev', 'branch_nested'].filter(name => name !== database);
+        const before = await Promise.all(others.map(name => tables.list(name)));
+        const result = await maintenance.reset(database);
+        assert.equal(result.reset, true);
+        assert.equal(result.cleanupWarning, null);
+        assert.deepEqual(await tables.list(database), []);
+        assert.equal((await withDatabase(config, database, client =>
+          client.query("SELECT 1 FROM pg_namespace WHERE nspname='reset_extra'"))).rowCount, 0);
+        assert.deepEqual(catalog!.store.branches(), inventory);
+        for (const name of credentials.keys()) assert.deepEqual(await roles.get(name), credentials.get(name));
+        for (let i = 0; i < others.length; i++) assert.deepEqual(await tables.list(others[i]), before[i]);
+        assert.ok(catalog!.store.backup(backup.id));
+      }
+      assert.ok((await backups.list('branch_nested')).some(item => item.id === backup.id && item.available));
+      assert.equal(poolActions.at(-1), 'resume:branch_nested');
+    });
+
+    await t.test('failed reset leaves original data intact and still resumes pooled traffic', async () => {
+      await postgres.query('branch_dev', 'CREATE TABLE keep_on_failure(id int)');
+      const original = roles.grantAccess.bind(roles);
+      roles.grantAccess = async () => { throw new Error('injected reset staging failure'); };
+      try {
+        await assert.rejects(maintenance.reset('branch_dev'), /injected reset staging failure/);
+        assert.ok((await tables.list('branch_dev')).some(table => table.name === 'keep_on_failure'));
+        assert.equal(poolActions.at(-1), 'resume:branch_dev');
+      } finally { roles.grantAccess = original; }
     });
 
     await t.test('previous Postgres admin metadata migrates to SQLite without deleting originals', async () => {

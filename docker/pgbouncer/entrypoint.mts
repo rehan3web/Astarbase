@@ -15,6 +15,7 @@ export async function writePoolConfig(directory: string, env: NodeJS.ProcessEnv)
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await chmod(directory, 0o700);
   const usersFile = path.join(directory, 'users.txt');
+  const hbaFile = path.join(directory, 'pg_hba.conf');
   const configFile = path.join(directory, 'pgbouncer.ini');
   let poolSize = 20;
   try {
@@ -24,6 +25,16 @@ export async function writePoolConfig(directory: string, env: NodeJS.ProcessEnv)
   // Escape PgBouncer userlist quotes, never interpolate credentials into a shell.
   await writeFile(usersFile, `"${user}" "${password.replaceAll('"', '""')}"\n`, { mode: 0o600 });
   await chmod(usersFile, 0o600);
+  // auth_user is still used internally over the Postgres Unix socket. It must
+  // never be accepted as a public PgBouncer client or public console admin.
+  await writeFile(hbaFile, `local all "${user}" scram-sha-256
+host all "${user}" 0.0.0.0/0 reject
+host all "${user}" ::/0 reject
+local all all scram-sha-256
+host all all 0.0.0.0/0 scram-sha-256
+host all all ::/0 scram-sha-256
+`, { mode: 0o600 });
+  await chmod(hbaFile, 0o600);
   await writeFile(configFile, `[databases]
 * = host=/var/run/postgresql port=5432
 
@@ -31,9 +42,11 @@ export async function writePoolConfig(directory: string, env: NodeJS.ProcessEnv)
 listen_addr = 0.0.0.0
 listen_port = 6432
 unix_socket_dir = /tmp
-auth_type = scram-sha-256
+auth_type = hba
+auth_hba_file = ${hbaFile}
 auth_file = ${usersFile}
 auth_user = ${user}
+admin_users = ${user}
 auth_dbname = postgres
 auth_query = SELECT usename, passwd FROM astarbase_pool_auth.lookup($1)
 pool_mode = transaction
