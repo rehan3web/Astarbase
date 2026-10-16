@@ -181,12 +181,17 @@ try {
     for (const name of ['items', 'comments']) {
       const row = explorer.locator(`[data-table-explorer-row="${name}"]`)
       await expect(row).toHaveText(name)
-      await expect(row.getByRole('button', { name: `Actions for ${name}`, exact: true })).toBeVisible()
       assert.deepEqual(await row.evaluate(element => {
         const style = getComputedStyle(element)
         return { animation: style.animationName, transition: style.transitionDuration }
       }), { animation: 'none', transition: '0s' })
       await row.click()
+      await expect(row.getByRole('button', { name: `Actions for ${name}`, exact: true })).toBeVisible()
+      await expect(explorer.getByRole('button', { name: /^Actions for / })).toHaveCount(1)
+      const otherName = name === 'items' ? 'comments' : 'items'
+      const otherRow = explorer.locator(`[data-table-explorer-row="${otherName}"]`)
+      await otherRow.hover()
+      await expect(otherRow.locator('button')).toBeHidden()
       await row.getByRole('button', { name: `Actions for ${name}`, exact: true }).click()
       const menu = page.getByRole('menu')
       await expect(menu).toBeVisible()
@@ -197,9 +202,36 @@ try {
       await expect(page.getByRole('menuitem', { name: 'Edit table', exact: true })).toBeVisible()
       await page.keyboard.press('Escape')
     }
+    await explorer.locator('[data-table-explorer-row="items"]').click()
+    await explorer.getByRole('button', { name: 'Actions for items', exact: true }).click()
+    const darkBackground = await page.getByRole('menu').evaluate(element => getComputedStyle(element).backgroundColor)
+    await page.keyboard.press('Escape')
+    await page.emulateMedia({ colorScheme: 'light' })
+    await page.evaluate(() => localStorage.setItem('studio-theme', 'light'))
+    await page.reload()
+    await expect(page.locator('html')).toHaveClass(/light/)
+    await explorer.locator('[data-table-explorer-row="items"]').click()
+    await explorer.getByRole('button', { name: 'Actions for items', exact: true }).click()
+    await expect(page.getByRole('menu')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await page.getByRole('menuitem', { name: 'Export data', exact: true }).hover()
+    await expect(page.getByRole('menu')).toHaveCount(2)
+    for (const menu of await page.getByRole('menu').all()) {
+      await expect(menu).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    }
+    await snapshot('light-dropdown')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.evaluate(() => localStorage.setItem('studio-theme', 'dark'))
+    await page.reload()
+    await explorer.locator('[data-table-explorer-row="items"]').click()
+    await explorer.getByRole('button', { name: 'Actions for items', exact: true }).click()
+    await expect(page.getByRole('menu')).toHaveCSS('background-color', darkBackground)
+    await page.keyboard.press('Escape')
+    console.log('PASS: light dropdowns and submenus are exactly #FFFFFF; dark background unchanged')
     await snapshot('table-explorer')
     assert.deepEqual(browserErrors, [])
-    console.log('PASS: Table Explorer hides row counts, keeps three-dot actions visible and opens menus without animation')
+    console.log('PASS: only the selected table has three-dot actions, including on hover; no row counts or click/menu animations')
     return
   }
 

@@ -638,7 +638,7 @@ export function SqlSidebar({
         <div
           ref={menuRef}
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 min-w-[12rem] overflow-hidden rounded-md border border-overlay bg-surface-100 p-1 text-foreground shadow-2xl text-xs animate-in fade-in-0 zoom-in-95"
+          className="studio-dropdown fixed z-50 min-w-[12rem] overflow-hidden rounded-md border border-overlay bg-surface-100 p-1 text-foreground shadow-2xl text-xs animate-in fade-in-0 zoom-in-95"
           onClick={(e) => e.stopPropagation()}
         >
           {contextMenu.type === 'folder' ? (

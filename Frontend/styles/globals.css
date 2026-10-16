@@ -541,3 +541,10 @@ b {
   z-index: 9999;
 }
 
+/* Keep light-mode dropdown panels pure white without changing dark surfaces. */
+html.light [role="menu"],
+html.light [role="listbox"],
+html.light .studio-dropdown {
+  background-color: #FFFFFF !important;
+}
+

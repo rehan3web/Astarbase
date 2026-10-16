@@ -176,7 +176,7 @@ export function TableExplorer({
               <div className="flex items-center gap-1.5 shrink-0">
                 {onTableAction && (
                   <DropdownMenu
-                    open={isMenuOpen}
+                    open={isSelected && isMenuOpen}
                     onOpenChange={(open) => setOpenMenuTableId(open ? tbl.id : null)}
                   >
                     <DropdownMenuTrigger asChild>
@@ -185,7 +185,11 @@ export function TableExplorer({
                         onClick={(e) => e.stopPropagation()}
                         title={`Actions for "${tbl.name}"`}
                         aria-label={`Actions for ${tbl.name}`}
-                        className="flex items-center justify-center p-0.5 rounded text-foreground-lighter hover:text-foreground hover:bg-surface-200 transition-none cursor-pointer"
+                        tabIndex={isSelected ? 0 : -1}
+                        className={cn(
+                          'flex items-center justify-center p-0.5 rounded text-foreground-lighter hover:text-foreground hover:bg-surface-200 transition-none cursor-pointer',
+                          !isSelected && 'invisible pointer-events-none'
+                        )}
                       >
                         <MoreVertical className="h-3.5 w-3.5" />
                       </button>
