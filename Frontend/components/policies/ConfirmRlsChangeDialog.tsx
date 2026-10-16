@@ -17,8 +17,8 @@ type Props = {
 
 const copy: Record<RlsConfirmation['kind'], { title: string; description: React.ReactNode; button: string }> = {
   enable: {
-    title: 'Enable row level security?',
-    description: <>Enabling RLS without any applicable policies denies normal clients access to table rows. RLS does not grant table privileges; database grants are still required.</>,
+    title: 'Enable Row Level Security',
+    description: <>RLS restricts table access until policies allow a request. Existing queries may stop returning rows until policies are added. RLS does not grant table privileges; database grants are still required.</>,
     button: 'Enable RLS',
   },
   disable: {

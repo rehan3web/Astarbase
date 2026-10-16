@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, CircleHelp, LockKeyhole, Pencil, Plus, RefreshCw, Search, Shield, ShieldCheck, ShieldOff, Trash2 } from 'lucide-react'
+import { AlertTriangle, CircleHelp, LockKeyhole, Pencil, Plus, RefreshCw, Search, Shield, ShieldOff, Table as TableIcon, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
@@ -179,21 +179,24 @@ export function PoliciesPageView() {
         <div className="flex flex-col gap-4 border-b border-default bg-dash-sidebar p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2 text-xs font-medium text-foreground-lighter"><Shield className="h-4 w-4" /> Table policies</div>
-            <div className="flex min-w-0 items-center gap-2"><Search className="h-3.5 w-3.5 shrink-0 text-foreground-lighter" /><Input aria-label="Search tables" placeholder="Filter tables…" value={search} onChange={event => setSearch(event.target.value)} className="h-8 w-full bg-studio text-xs sm:w-48" /></div>
+            <div className="relative flex min-w-0 items-center sm:w-48">
+              <Input aria-label="Search tables" placeholder="Filter tables…" iconLeft={<Search aria-hidden="true" className="h-3.5 w-3.5" />} value={search} onChange={event => setSearch(event.target.value)} className="h-8 w-full bg-studio text-xs" />
+            </div>
             {selection}
           </div>
-          <Button variant="primary" size="small" onClick={openCreate} disabled={!current || loading}><Plus className="mr-1.5 h-3.5 w-3.5" /> Create policy</Button>
+          {current && !current.enabled
+            ? <Button variant="primary" size="small" onClick={() => setConfirmation({ kind: 'enable' })} disabled={loading}><Shield className="mr-1.5 h-3.5 w-3.5" /> Enable RLS</Button>
+            : <Button variant="primary" size="small" onClick={openCreate} disabled={!current || loading}><Plus className="mr-1.5 h-3.5 w-3.5" /> Add RLS policy</Button>}
         </div>
 
         <div className="flex flex-col gap-3 border-b border-default bg-studio p-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
             <div className={`mt-0.5 rounded-md border p-2 ${current?.enabled ? 'border-brand/25 bg-brand/10 text-brand' : 'border-default bg-surface-100 text-foreground-lighter'}`}>
-              {current?.enabled ? <ShieldCheck className="h-4 w-4" /> : <ShieldOff className="h-4 w-4" />}
+              {current?.enabled ? <TableIcon className="h-4 w-4" /> : <ShieldOff className="h-4 w-4" />}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
                 {current ? <code className="font-mono">{current.schema}.{current.name}</code> : loading ? 'Loading tables…' : 'No table selected'}
-                {current && <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${current.enabled ? 'bg-brand/10 text-brand' : 'bg-surface-200 text-foreground-lighter'}`}>{current.enabled ? 'RLS enabled' : 'RLS disabled'}</span>}
                 {current?.forced && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-500">Forced</span>}
               </div>
               <p className="mt-1 max-w-3xl text-xs leading-relaxed text-foreground-lighter">
@@ -205,9 +208,7 @@ export function PoliciesPageView() {
             </div>
           </div>
           {current && <div className="flex shrink-0 flex-wrap gap-2">
-            <Button variant={current.enabled ? 'default' : 'primary'} size="small" onClick={() => setConfirmation({ kind: current.enabled ? 'disable' : 'enable' })}>
-              {current.enabled ? 'Disable RLS' : 'Enable RLS'}
-            </Button>
+            {current.enabled && <Button variant="default" size="small" onClick={() => setConfirmation({ kind: 'disable' })}>Disable RLS</Button>}
             <Button variant="default" size="small" onClick={() => setConfirmation({ kind: current.forced ? 'unforce' : 'force' })}>
               {current.forced ? 'Remove FORCE' : 'Force RLS'}
             </Button>
@@ -270,24 +271,16 @@ export function PoliciesPageView() {
             <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full border border-default bg-surface-100 text-foreground-lighter"><LockKeyhole className="h-4 w-4" /></div>
             <p className="text-sm font-medium text-foreground">No policies defined</p>
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground-lighter">{current.enabled ? 'No applicable policies means normal clients cannot access rows in this table.' : 'You can define policies before enabling RLS. They take effect when row level security is enabled.'}</p>
-            <Button variant="default" size="small" className="mt-4" onClick={openCreate}><Plus className="mr-1.5 h-3.5 w-3.5" /> Create first policy</Button>
+            {current.enabled
+              ? <Button variant="default" size="small" className="mt-4" onClick={openCreate}><Plus className="mr-1.5 h-3.5 w-3.5" /> Create first policy</Button>
+              : <Button variant="primary" size="small" className="mt-4" onClick={() => setConfirmation({ kind: 'enable' })}><Shield className="mr-1.5 h-3.5 w-3.5" /> Enable RLS</Button>}
           </div>}
         </div>}
       </section>
 
-      {catalog?.roles && <section className="rounded-lg border border-default bg-studio p-4">
-        <div className="mb-3 flex items-center justify-between"><div><h2 className="text-xs font-medium text-foreground">Database roles</h2><p className="mt-1 text-[11px] text-foreground-lighter">Roles with elevated RLS bypass are marked below.</p></div><span className="text-[10px] text-foreground-lighter">{catalog.roles.length} roles</span></div>
-        {catalog.roles.length ? <div className="flex flex-wrap gap-2">{catalog.roles.map(role => <div key={role.name} className="flex items-center gap-2 rounded-md border border-default bg-surface-100 px-2.5 py-1.5 text-[11px]">
-          <span className="font-mono text-foreground">{role.name}</span>
-          {role.superuser && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-500">SUPERUSER</span>}
-          {!role.superuser && role.bypassRls && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-500">BYPASSRLS</span>}
-          {role.login && <span className="text-foreground-lighter">LOGIN</span>}
-        </div>)}</div> : <p className="text-xs text-foreground-lighter">No role metadata returned.</p>}
-        <p className="mt-3 flex items-start gap-1.5 text-[10px] text-foreground-lighter"><Check className="mt-0.5 h-3 w-3 shrink-0" /> Policies restrict row access but do not grant schema or table privileges.</p>
-      </section>}
     </div>
 
-    <PolicyDialog open={editorOpen} onOpenChange={setEditorOpen} roles={catalog?.roles ?? []} policy={editorPolicy} busy={saving} error={editorError} onSave={savePolicy} />
+    <PolicyDialog open={editorOpen} onOpenChange={setEditorOpen} roles={catalog?.roles ?? []} policy={editorPolicy} schema={current?.schema ?? ''} table={current?.name ?? ''} busy={saving} error={editorError} onSave={savePolicy} />
     <ConfirmRlsChangeDialog action={confirmation} busy={confirmationBusy} error={operationError} onOpenChange={open => { if (!open) { setConfirmation(null); setOperationError('') } }} onConfirm={() => void applyConfirmedChange()} />
   </div>
 }
