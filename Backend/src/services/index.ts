@@ -12,6 +12,7 @@ import { ConnectionService } from './connection/connection.service.js';
 import { ClientRolesService } from './connection/client-roles.service.js';
 import { PoolerService } from './connection/pooler.service.js';
 import { DatabaseMaintenanceService } from './connection/maintenance.service.js';
+import { PoliciesService } from './policies/policies.service.js';
 
 export function createServices(config: Config) {
   const catalog = new Catalog(config);
@@ -24,6 +25,7 @@ export function createServices(config: Config) {
   return {
     catalog, postgres, branches, tables, metrics, clientRoles,
     connection: new ConnectionService(config, catalog, clientRoles),
+    policies: new PoliciesService(config, catalog),
     pooler, maintenance: new DatabaseMaintenanceService(config, catalog, branches, pooler),
     auth: new AuthService(config, catalog.store),
     backups: new BackupService(catalog, postgres, branches),

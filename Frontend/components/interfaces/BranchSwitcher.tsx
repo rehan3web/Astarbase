@@ -5,6 +5,7 @@ import { GitBranch, Search, Plus, Check, ChevronsUpDown, Loader2 } from 'lucide-
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
@@ -89,7 +90,17 @@ export function BranchSwitcher() {
             </DialogHeader>
             <div className="py-4 space-y-4">
               <div className="space-y-1.5"><label className="text-xs font-medium text-foreground">Branch name <span className="text-destructive">*</span></label><Input aria-label="New branch name" placeholder="e.g. staging, feature_auth" value={newBranchName} onChange={e => setNewBranchName(e.target.value)} pattern="[a-z][a-z0-9_]{0,47}" maxLength={48} disabled={isCreating} required autoFocus className="bg-surface-200 border-strong text-foreground placeholder:text-foreground-muted text-xs h-9 focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" /></div>
-              <div className="space-y-1.5"><label className="text-xs font-medium text-foreground">Parent database</label><select aria-label="Parent database" value={parentDatabase} onChange={e => setParentDatabase(e.target.value)} disabled={isCreating} className="w-full bg-surface-200 border border-strong rounded-md text-xs h-9 px-2.5 text-foreground outline-none focus:ring-1 focus:ring-strong cursor-pointer">{branches.map(item => <option key={item.name} value={item.database_name}>{item.name} · {item.database_name}</option>)}</select></div>
+              <div className="space-y-1.5">
+                <label htmlFor="switcher-branch-parent" className="text-xs font-medium text-foreground">Parent database</label>
+                <Select value={parentDatabase} onValueChange={setParentDatabase} disabled={isCreating}>
+                  <SelectTrigger id="switcher-branch-parent" aria-label="Parent database" className="h-9 w-full">
+                    <SelectValue placeholder="Select parent database" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map(item => <SelectItem key={item.name} value={item.database_name}>{item.name} · {item.database_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5"><label htmlFor="switcher-new-tag" className="text-xs font-medium text-foreground">Environment tag</label><Input id="switcher-new-tag" aria-label="Environment tag" placeholder="e.g. dev, staging, production" value={newBranchTag} onChange={e => setNewBranchTag(e.target.value)} maxLength={32} disabled={isCreating} className="bg-surface-200 border-strong text-foreground placeholder:text-foreground-muted text-xs h-9 focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" /><p className="text-[10px] text-foreground-muted">Leave blank to create without a tag.</p></div>
             </div>
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">

@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
@@ -261,9 +262,14 @@ export function BranchesPageView() {
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="branch-parent" className="text-xs font-medium text-foreground">Parent database</label>
-                <select id="branch-parent" aria-label="Parent database" value={parentDatabase} onChange={event => setParentDatabase(event.target.value)} disabled={busy} className="w-full bg-surface-200 border border-strong rounded-md text-xs h-9 px-2.5 text-foreground outline-none focus:ring-1 focus:ring-strong cursor-pointer">
-                  {branches.map(branch => <option key={branch.name} value={branch.database_name}>{branch.name} · {branch.database_name}</option>)}
-                </select>
+                <Select value={parentDatabase} onValueChange={setParentDatabase} disabled={busy}>
+                  <SelectTrigger id="branch-parent" aria-label="Parent database" className="h-9 w-full">
+                    <SelectValue placeholder="Select parent database" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map(branch => <SelectItem key={branch.name} value={branch.database_name}>{branch.name} · {branch.database_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="branch-new-tag" className="text-xs font-medium text-foreground">Environment tag</label>

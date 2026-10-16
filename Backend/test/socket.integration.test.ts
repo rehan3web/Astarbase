@@ -23,6 +23,7 @@ import { TableService } from '../src/services/tables/tables.service.js';
 import { SchemaService } from '../src/services/visualizer/visualizer.service.js';
 import { ClientRolesService } from '../src/services/connection/client-roles.service.js';
 import { verifyPoolerNetwork } from './pooler-network.integration.js';
+import { verifyPolicies } from './policies.integration.js';
 
 const run = promisify(execFile);
 test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and backup restore', {
@@ -360,6 +361,10 @@ test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and
         assert.ok((await tables.list('branch_dev')).some(table => table.name === 'keep_on_failure'));
         assert.equal(poolActions.at(-1), 'resume:branch_dev');
       } finally { roles.grantAccess = original; }
+    });
+
+    await t.test('RLS policies enforce real client row filtering and checks; atomic edits, FORCE and branch isolation work', async () => {
+      await verifyPolicies(config, catalog!, roles);
     });
 
     await t.test('previous Postgres admin metadata migrates to SQLite without deleting originals', async () => {

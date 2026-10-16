@@ -22,6 +22,7 @@ import { pipeline } from 'node:stream/promises'
 import { verifyVisualizerCopy } from './visualizer-copy.browser'
 import { verifySqlExecutionFeedback } from './sql-results.browser'
 import { verifyDatabaseMaintenance } from './database-maintenance.browser'
+import { verifyPoliciesUi } from './policies.browser'
 
 async function main() {
 const run = promisify(execFile)
@@ -174,6 +175,54 @@ try {
   assert.equal(csrf.status(), 403)
   if (process.env.STUDIO_AUTH_ONLY === '1') {
     assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  if (process.env.STUDIO_RLS_ONLY === '1') {
+    await verifyPoliciesUi(page, url, services, config, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  if (process.env.STUDIO_BRANCH_DROPDOWN_ONLY === '1') {
+    await services.branches.create('dropdown_parent')
+    await page.goto(`${url}/branches`)
+    for (const entry of ['page', 'header'] as const) {
+      if (entry === 'page') {
+        await page.getByRole('button', { name: 'Create branch', exact: true }).click()
+      } else {
+        await page.getByRole('button', { name: 'Active branch', exact: true }).click()
+        await page.getByRole('button', { name: 'Create new branch', exact: true }).click()
+      }
+      const dialog = page.getByRole('dialog')
+      const parent = dialog.getByRole('combobox', { name: 'Parent database', exact: true })
+      assert.equal(await parent.evaluate(element => element.tagName), 'BUTTON')
+      for (const theme of ['dark', 'light']) {
+        await page.evaluate(theme => {
+          document.documentElement.classList.remove('light', 'dark')
+          document.documentElement.classList.add(theme)
+        }, theme)
+        await parent.click()
+        await expect(page.getByRole('listbox')).toBeVisible()
+        if (theme === 'light') {
+          assert.equal(await page.getByRole('listbox').evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(255, 255, 255)')
+        }
+        await snapshot(`branch-parent-${entry}-${theme}`)
+        await page.keyboard.press('Escape')
+        await expect(dialog).toBeVisible()
+      }
+      await parent.focus()
+      await page.keyboard.press('ArrowDown')
+      await expect(page.getByRole('listbox')).toBeVisible()
+      await page.getByRole('option', { name: entry === 'page' ? /^dropdown_parent ·/ : /^main ·/ }).click()
+      await expect(parent).toContainText(entry === 'page' ? 'dropdown_parent' : 'main')
+      await dialog.getByLabel('New branch name', { exact: true }).fill(`dropdown_${entry}`)
+      await dialog.getByRole('button', { name: 'Create branch', exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+      assert.equal(services.catalog.store.branch(`dropdown_${entry}`)?.parent_name, entry === 'page' ? 'dropdown_parent' : 'main')
+    }
+    assert.deepEqual(browserErrors, [])
+    console.log('PASS: both branch creation entry points use shared styled dropdowns, white/light and dark menus, keyboard selection and real parent selection')
     return
   }
 

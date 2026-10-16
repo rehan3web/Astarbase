@@ -75,6 +75,32 @@ editor. Default Compose connections do not enable TLS: use a trusted network
 or a secure tunnel. These are external client examples, not an Admin Studio
 TCP connection; admin operations remain on shared kernel Unix sockets.
 
+### Row level security policies
+
+The Policies page lists actual PostgreSQL policies for the selected database and
+table, rather than table columns. Create, edit (including rename, command and
+mode), or delete policies; select multiple target roles and supply `USING` /
+`WITH CHECK` PostgreSQL expressions. Supported commands are ALL, SELECT, INSERT,
+UPDATE and DELETE; modes are PERMISSIVE and RESTRICTIVE. Table-editor policy
+links open the corresponding table. All changes persist in the selected
+Postgres database, not SQLite, and do not alter other branches.
+
+Enable/disable RLS, FORCE/remove FORCE and deletion require confirmation.
+Policy replacement is transactional: invalid SQL or missing roles leave the
+original policy intact. Definitions can be saved while RLS is disabled.
+Enabling RLS without applicable policies denies ordinary clients row access.
+Policies restrict access but do not grant table/schema privileges.
+Permissive policies combine with OR; restrictive policies combine with AND and
+require an applicable permissive policy. Omitted predicates follow PostgreSQL
+defaults, including WITH CHECK inheriting USING for ALL/UPDATE.
+
+**Important:** Studio's internal superuser and other SUPERUSER/BYPASSRLS roles
+always bypass RLS, including FORCE. Ordinary table owners bypass it unless FORCE
+is enabled. Verify row access with your database's non-superuser client login,
+not the Studio SQL editor. Application-user identity functions/session context
+are application-managed; Studio does not provision Supabase-style `auth.uid()`
+or interpret an application login as a PostgreSQL role.
+
 ### Database credentials and pool settings
 
 Studio preferences are no longer shown in Database Settings. Each new branch,
