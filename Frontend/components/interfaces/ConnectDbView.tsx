@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Clipboard, Eye, EyeOff, Plug, RotateCw } from 'lucide-react'
+import { Clipboard, Eye, EyeOff, Plug, RotateCw } from 'lucide-react'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
+import { copyText } from '@/lib/copy-text'
 import { ConnectionMetadata, ConnectionMode, formatConnection } from '@/lib/connection-details'
 
 type Tab = { id: ConnectionMode; label: string }
@@ -41,15 +42,29 @@ export function ConnectDbView() {
   const [reveal, setReveal] = useState<RevealState | null>(null)
   const [revealing, setRevealing] = useState(false)
   const [revealError, setRevealError] = useState(false)
+  const [copying, setCopying] = useState(false)
   const revealSequence = useRef(0)
   const revealController = useRef<AbortController | null>(null)
+  const copySequence = useRef(0)
+  const copyController = useRef<AbortController | null>(null)
   const requestSequence = useRef(0)
+  const currentIdentity = useRef(`${database}\u0000${tab}`)
+  currentIdentity.current = `${database}\u0000${tab}`
 
-  const loadMetadata = useCallback(async () => {
-    const requestId = ++requestSequence.current
+  const cancelSensitiveActions = useCallback(() => {
     revealSequence.current += 1
     revealController.current?.abort()
+    revealController.current = null
+    copySequence.current += 1
+    copyController.current?.abort()
+    copyController.current = null
     setRevealing(false)
+    setCopying(false)
+  }, [])
+
+  const loadMetadata = useCallback(async () => {
+    cancelSensitiveActions()
+    const requestId = ++requestSequence.current
     setLoading(true)
     setLoadError(false)
     setMetadata(null)
@@ -70,7 +85,7 @@ export function ConnectDbView() {
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
-  }, [database])
+  }, [cancelSensitiveActions, database])
 
   useEffect(() => {
     void loadMetadata()
@@ -78,8 +93,10 @@ export function ConnectDbView() {
       requestSequence.current += 1
       revealSequence.current += 1
       revealController.current?.abort()
+      copySequence.current += 1
+      copyController.current?.abort()
     }
-  }, [loadMetadata])
+  }, [cancelSensitiveActions, loadMetadata])
 
   const activeMetadata = metadataFor === database ? metadata : null
   const resolvedHost = useMemo(() => {
@@ -96,16 +113,14 @@ export function ConnectDbView() {
     : ''
 
   const clearPassword = useCallback(() => {
-    revealSequence.current += 1
-    revealController.current?.abort()
-    revealController.current = null
+    cancelSensitiveActions()
     setReveal(null)
-    setRevealing(false)
     setRevealError(false)
-  }, [])
+  }, [cancelSensitiveActions])
 
   const selectTab = (next: ConnectionMode) => {
     if (next === tab) return
+    currentIdentity.current = `${database}\u0000${next}`
     clearPassword()
     setTab(next)
   }
@@ -138,15 +153,35 @@ export function ConnectDbView() {
 
   const copyDisplayed = async () => {
     if (!formatted) return
+    const identity = `${database}\u0000${tab}`
+    const copyId = ++copySequence.current
+    const controller = new AbortController()
+    copyController.current?.abort()
+    copyController.current = controller
+    setCopying(true)
     try {
-      await navigator.clipboard.writeText(formatted)
+      let textToCopy = formatted
       if (activePassword === null) {
-        notify('Copied the displayed text. Reveal the password before using this connection.', 'warning')
-      } else {
-        notify('Connection details copied', 'success')
+        const result = await api<{ password: string }>(
+          `/databases/${encodeURIComponent(database)}/connection/reveal`,
+          { method: 'POST', body: {}, signal: controller.signal },
+        )
+        if (copyId !== copySequence.current || controller.signal.aborted || currentIdentity.current !== identity) return
+        if (typeof result.password !== 'string' || !activeMetadata || !resolvedHost) throw new Error('Could not prepare connection details')
+        textToCopy = formatConnection({ ...activeMetadata, host: resolvedHost }, result.password, tab)
       }
+      if (copyId !== copySequence.current || controller.signal.aborted || currentIdentity.current !== identity) return
+      await copyText(textToCopy)
+      if (copyId === copySequence.current && currentIdentity.current === identity) notify('Connection details copied', 'success')
     } catch {
-      notify('Could not copy connection details. Check clipboard permissions and try again.', 'error')
+      if (copyId === copySequence.current && !controller.signal.aborted && currentIdentity.current === identity) {
+        notify('Could not copy connection details. Check access and try again.', 'error')
+      }
+    } finally {
+      if (copyId === copySequence.current) {
+        setCopying(false)
+        copyController.current = null
+      }
     }
   }
 
@@ -219,80 +254,46 @@ export function ConnectDbView() {
               ))}
             </div>
 
-            <div className="space-y-5 p-4 sm:p-6">
-              {hostFallback && (
-                <div className="rounded-md border border-default bg-surface-200/60 px-3 py-2 text-xs text-foreground-lighter">
-                  Using this browser’s host (<span className="font-mono text-foreground">{resolvedHost}</span>) because DATABASE_PUBLIC_HOST was not provided.
-                </div>
+            <div className="space-y-3 p-4 sm:p-6">
+              {(hostFallback || activeMetadata.sslMode === 'disable') && (
+                <p className="text-[11px] text-foreground-muted">
+                  {hostFallback && <>Using browser host <span className="font-mono text-foreground-lighter">{resolvedHost}</span> because DATABASE_PUBLIC_HOST is unset.</>}
+                  {hostFallback && activeMetadata.sslMode === 'disable' && <span className="mx-1.5">·</span>}
+                  {activeMetadata.sslMode === 'disable' && 'TLS is disabled for this connection.'}
+                </p>
               )}
               {tab === 'transaction-pooler' && (
-                <div className="rounded-md border border-default bg-surface-200/60 px-3 py-2.5 text-xs leading-relaxed text-foreground-lighter">
-                  Transaction pooler uses port <span className="font-mono text-foreground">{activeMetadata.poolerPort}</span>. Transaction pooling may not support prepared statements or other session-level features; use a direct connection when your client requires them.
-                </div>
+                <p className="text-[11px] leading-relaxed text-foreground-muted">
+                  Transaction pooling may not support prepared statements or session-level features.
+                </p>
               )}
 
-              <div className="space-y-1.5">
-                <label htmlFor="connection-editor" className="text-xs font-medium text-foreground-light">
-                  {tab === 'connection-string' && 'Direct connection string'}
-                  {tab === 'transaction-pooler' && 'Transaction pooler connection string'}
-                  {tab === 'psql' && 'PSQL command'}
-                  {tab === 'parameters' && 'Environment variables'}
-                </label>
+              <div data-connection-snippet className="overflow-hidden rounded-md border border-strong bg-surface-200">
                 <textarea
                   id="connection-editor"
                   aria-label="Connection details"
                   readOnly
                   spellCheck={false}
                   value={formatted}
-                  rows={tab === 'parameters' ? 6 : 2}
-                  className="block w-full resize-y rounded-md border border-strong bg-surface-200 px-3 py-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-1 focus-visible:ring-strong"
+                  rows={tab === 'parameters' ? 6 : 4}
+                  className="block min-h-[180px] w-full resize-y border-0 bg-transparent px-4 py-4 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-strong"
                 />
-                <p className="text-[11px] text-foreground-muted">
-                  {tab === 'transaction-pooler'
-                    ? `Database ${activeMetadata.database} · Pooler port ${activeMetadata.poolerPort}`
-                    : `Database ${activeMetadata.database} · Direct port ${activeMetadata.directPort}`}
-                  {' · '}SSL mode: {activeMetadata.sslMode}
-                </p>
-                <p className="text-[11px] text-foreground-muted">
-                  The default Docker setup does not enable TLS. Use a trusted network or secure tunnel.
-                  {tab === 'parameters' && ' These are shell-compatible environment assignments.'}
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row sm:items-end sm:justify-between">
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <label htmlFor="connection-password" className="text-xs font-medium text-foreground-light">Database password</label>
-                  <div className="flex gap-2">
-                    <input
-                      id="connection-password"
-                      readOnly
-                      type={masked ? 'password' : 'text'}
-                      value={masked ? '••••••••••••••••' : (activePassword ?? '')}
-                      aria-label="Database password"
-                      className="h-9 min-w-0 flex-1 rounded-md border border-strong bg-surface-200 px-3 font-mono text-xs text-foreground outline-none"
-                    />
-                    {masked ? (
-                      <Button size="small" variant="default" loading={revealing} onClick={() => void revealPassword()} iconLeft={<Eye className="h-3.5 w-3.5" />}>
-                        Show password
-                      </Button>
-                    ) : (
-                      <Button size="small" variant="default" onClick={clearPassword} iconLeft={<EyeOff className="h-3.5 w-3.5" />}>
-                        Hide password
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-foreground-muted">The password is requested only when you choose to show it.</p>
-                  {revealError && <p role="alert" className="text-xs text-red-400">Password reveal failed. Your connection details remain masked; try again.</p>}
+                <div className="flex flex-wrap items-center gap-2 border-t border-default px-3 py-2">
+                  <Button size="small" variant="ghost" loading={copying} disabled={copying || revealing} onClick={() => void copyDisplayed()} iconLeft={<Clipboard className="h-3.5 w-3.5" />}>
+                    Copy snippet
+                  </Button>
+                  {masked ? (
+                    <Button size="small" variant="ghost" loading={revealing} disabled={copying || revealing} onClick={() => void revealPassword()} iconLeft={<Eye className="h-3.5 w-3.5" />}>
+                      Show password
+                    </Button>
+                  ) : (
+                    <Button size="small" variant="ghost" disabled={copying} onClick={clearPassword} iconLeft={<EyeOff className="h-3.5 w-3.5" />}>
+                      Hide password
+                    </Button>
+                  )}
                 </div>
-                <Button
-                  size="small"
-                  variant="default"
-                  onClick={() => void copyDisplayed()}
-                  iconLeft={masked ? <Clipboard className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
-                >
-                  Copy displayed text
-                </Button>
               </div>
+              {revealError && <p role="alert" className="text-xs text-red-400">Password reveal failed. The snippet remains masked; try again.</p>}
             </div>
           </section>
         )}

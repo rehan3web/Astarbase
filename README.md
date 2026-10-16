@@ -64,9 +64,12 @@ so custom port mappings appear in the generated client strings.
 
 Passwords are masked by default, never included in metadata reads, and only
 returned by an authenticated, same-origin POST after **Show password** is
-clicked. Hide, tab changes, branch changes, and navigation clear the revealed
+clicked, or transiently for an explicit **Copy snippet** action. Hide, tab changes, branch changes, and navigation clear the revealed
 password from the view. Credentials are not saved in SQLite/browser storage.
-Copy uses the currently displayed text; masked copies require a real password.
+The password is masked directly inside the snippet, not in a separate field.
+**Copy snippet** and **Show password / Hide password** share the snippet footer.
+Copy produces a usable connection string including the real password without
+revealing it onscreen; copying credentials requires an explicit button click.
 Parameters displays shell-compatible `PG*` environment assignments in one
 editor. Default Compose connections do not enable TLS: use a trusted network
 or a secure tunnel. These are external client examples, not an Admin Studio

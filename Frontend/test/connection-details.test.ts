@@ -21,7 +21,7 @@ test('real direct/pooler URIs correctly encode credentials and bracket IPv6 addr
   }
   for (const mode of ['connection-string', 'transaction-pooler', 'psql', 'parameters'] as const) {
     const value = formatConnection(metadata, null, mode)
-    assert.ok(value.includes('[YOUR-PASSWORD]'))
+    assert.ok(value.includes('****************'))
     assert.equal(value.includes(password), false)
   }
 })

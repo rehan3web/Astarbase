@@ -9,7 +9,7 @@ export type ConnectionMetadata = {
 
 export type ConnectionMode = 'connection-string' | 'transaction-pooler' | 'psql' | 'parameters'
 
-const MASKED_PASSWORD = '[YOUR-PASSWORD]'
+const MASKED_PASSWORD = '****************'
 
 function encodeUriPart(value: string): string {
   return encodeURIComponent(value).replace(/[!'()*]/g, char =>
