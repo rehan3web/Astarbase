@@ -1,5 +1,7 @@
 import Docker from 'dockerode';
-import { PassThrough } from 'node:stream';
+import { PassThrough, type Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { dockerStdout } from './output.js';
 import type { Config } from '../../config.js';
 
 export class DockerService {
@@ -18,6 +20,21 @@ export class DockerService {
     // Separate short timeout: never apply this to long-running dump/restore execs.
     const client = new Docker({ socketPath: this.config.DOCKER_SOCKET, timeout: 8000 });
     return client.getContainer(this.config.POSTGRES_CONTAINER).stats({ stream: false });
+  }
+
+  async execTo(command: string[], destination: Writable) {
+    const exec = await this.docker.getContainer(this.config.POSTGRES_CONTAINER).exec({
+      Cmd: command, User: 'postgres', AttachStdout: true, AttachStderr: true, Tty: false,
+    });
+    const stream = await exec.start({ hijack: true, stdin: false });
+    const stderr = { text: '' };
+    try {
+      await pipeline(stream, source => dockerStdout(source, stderr), destination, {
+        end: false, signal: AbortSignal.timeout(3600000),
+      });
+      const result = await exec.inspect();
+      if (result.ExitCode !== 0) throw new Error(stderr.text.trim() || 'SQL export failed');
+    } finally { stream.destroy(); }
   }
 
   async exec(command: string[], timeoutMs = 300000, maxBytes = 8 * 1024 * 1024): Promise<{ stdout: string; stderr: string }> {
@@ -51,7 +68,7 @@ export class DockerService {
           bytes += chunk.length;
           if (bytes > maxBytes) {
             stream.destroy();
-            finish(new Error('Query output exceeds 8 MiB; use LIMIT or export a backup'));
+            finish(new Error(`Container output exceeds ${maxBytes / (1024 * 1024)} MiB; use LIMIT or export a backup`));
           } else { chunks.push(chunk); }
         };
         out.on('data', collect(stdout));

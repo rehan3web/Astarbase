@@ -139,12 +139,24 @@ commands. Do not use `down -v` unless you intend to delete database volumes.
 4. In Table Editor, select `studio_test`, edit a cell, refresh, and verify the
    persisted value. Test insert/delete and pagination.
 5. Create `dev` from `main` in Branches. Select `dev` using the header selector;
-   it maps to database `branch_dev`. Changes there do not modify main.
-6. Open Schema Visualizer to inspect live tables and foreign keys.
+   it maps to database `branch_dev`. Changes there do not modify main. The
+   Storage column reads each database's actual `pg_database_size`, not a sample
+   or a shared Docker volume total.
+6. Open Schema Visualizer to inspect live tables and foreign keys. **Copy as SQL**
+   exports the active database's complete schema using Docker `pg_dump
+   --schema-only`, including all user schemas, table definitions, identity
+   columns, defaults, indexes and constraints, without row data. Graph schema
+   selection does not restrict this SQL export. Copy supports HTTP deployments
+   where the browser Clipboard API is unavailable.
 7. Open **Settings → Backups**, create a backup on dev, modify dev's data, and
    restore the archive. Backups is not a main-sidebar item. Restore
    requires typing the exact target database name. Archives appear in
-   `Backend/backups/` as real Docker `pg_dump` files.
+   `Backend/backups/` as real Docker `pg_dump` files. The backup actions menu
+   downloads a plain `.sql` conversion of the saved snapshot using Docker
+   `pg_restore`; it does not dump the current live database. Delete backup
+   requires typing its exact backup ID and permanently removes the archive and
+   SQLite metadata without changing the live database. Missing archives cannot
+   be downloaded, but their stale metadata can still be deleted.
 8. Pull/refresh dev from main when wanted. This **replaces dev's contents**, not a
    merge, and requires typing `branch_dev`. Target database clients disconnect.
 9. Save Admin Settings and reload. Settings persist in

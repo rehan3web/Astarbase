@@ -17,6 +17,9 @@ import { startAdminListeners } from '../../Backend/src/services/system/listener.
 import { verifyConnectDb } from './connect-db.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
+import { verifyStorageAndBackups } from './backups.browser'
+import { pipeline } from 'node:stream/promises'
+import { verifyVisualizerCopy } from './visualizer-copy.browser'
 
 async function main() {
 const run = promisify(execFile)
@@ -56,6 +59,16 @@ try {
     assert.ok(['psql', 'pg_dump', 'pg_restore', 'stat', 'rm', 'find'].includes(exe))
     const result = await run(exe, args, { env: { ...process.env, PGHOST: pgSocket, PGUSER: config.DB_USER, PGPASSWORD: config.DB_PASSWORD }, maxBuffer: 8 * 1024 * 1024 })
     return { stdout: result.stdout, stderr: result.stderr }
+  }
+  services.postgres.docker.execTo = async (command, destination) => {
+    assert.equal(command[0], 'pg_restore')
+    const process = spawn(command[0], command.slice(1), { stdio: ['ignore', 'pipe', 'pipe'] })
+    const done = new Promise<void>((resolve, reject) => {
+      process.on('error', reject)
+      process.on('exit', code => code === 0 ? resolve() : reject(new Error('pg_restore failed')))
+    })
+    process.stderr.resume()
+    await Promise.all([pipeline(process.stdout, destination, { end: false }), done])
   }
   await pushDatabase(config, services.catalog.store)
   await withDatabase(config, config.DB_NAME, client => client.query(`
@@ -157,6 +170,20 @@ try {
   })
   assert.equal(csrf.status(), 403)
   if (process.env.STUDIO_AUTH_ONLY === '1') {
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  await verifyVisualizerCopy(page, url, config.DB_NAME)
+  await snapshot('visualizer-copy')
+  if (process.env.STUDIO_VISUALIZER_ONLY === '1') {
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  await verifyStorageAndBackups(page, url, id => services!.postgres.removeDump(id))
+  await snapshot('backup-actions')
+  if (process.env.STUDIO_BACKUPS_ONLY === '1') {
     assert.deepEqual(browserErrors, [])
     return
   }

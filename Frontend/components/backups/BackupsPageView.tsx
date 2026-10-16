@@ -49,6 +49,7 @@ export function BackupsPageView() {
   const [error, setError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [restoreOpen, setRestoreOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [targetBackup, setTargetBackup] = useState<Backup | null>(null)
   const [newBackupName, setNewBackupName] = useState('')
   const [targetDatabase, setTargetDatabase] = useState(database)
@@ -98,6 +99,44 @@ export function BackupsPageView() {
       if (result.cleanupWarning) notify(result.cleanupWarning, 'warning')
       else notify(`Backup restored into ${targetDatabase}. Clients must reconnect.`, 'success')
     } catch (reason) { const message = errorMessage(reason); setError(message); notify(message, 'error') } finally { setBusy('') }
+  }
+
+  const handleDownload = async (backup: Backup) => {
+    if (busy) return
+    setBusy(`download:${backup.id}`); setError('')
+    try {
+      const response = await fetch(`/api/studio/backups/${encodeURIComponent(backup.id)}/download`, {
+        credentials: 'same-origin', cache: 'no-store',
+      })
+      if (!response.ok) {
+        if (response.status === 401) window.dispatchEvent(new Event('studio-session-expired'))
+        const body = await response.json()
+        throw new Error(body.error || 'SQL dump download failed')
+      }
+      const blob = await response.blob()
+      const href = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = href; link.download = `backup-${backup.id}.sql`
+      document.body.appendChild(link); link.click(); link.remove()
+      setTimeout(() => URL.revokeObjectURL(href), 60000)
+      notify('SQL dump downloaded', 'success')
+    } catch (reason) { const message = errorMessage(reason); setError(message); notify(message, 'error') }
+    finally { setBusy('') }
+  }
+
+  const handleDelete = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!targetBackup || busy || confirmation !== targetBackup.id) return
+    setBusy('delete'); setError('')
+    try {
+      await api(`/backups/${encodeURIComponent(targetBackup.id)}`, {
+        method: 'DELETE', body: { confirmBackupId: confirmation },
+      })
+      setDeleteOpen(false); setTargetBackup(null); setConfirmation('')
+      await loadBackups()
+      notify('Backup deleted', 'success')
+    } catch (reason) { const message = errorMessage(reason); setError(message); notify(message, 'error') }
+    finally { setBusy('') }
   }
 
   return (
@@ -177,8 +216,8 @@ export function BackupsPageView() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44 bg-surface-100 border-default text-foreground shadow-xl">
-                  <DropdownMenuItem disabled title="The backup API has no download endpoint." className="text-xs gap-2 opacity-50">
-                    <Download className="h-3.5 w-3.5 text-foreground-lighter" />Download SQL dump unavailable
+                  <DropdownMenuItem disabled={!backup.available || !!busy} title={!backup.available ? 'Backup archive is missing from storage' : undefined} onSelect={() => void handleDownload(backup)} className="text-xs gap-2 cursor-pointer">
+                    <Download className="h-3.5 w-3.5 text-foreground-lighter" />Download SQL dump
                   </DropdownMenuItem>
                   <DropdownMenuItem disabled={!backup.available} className="text-xs gap-2 cursor-pointer" onSelect={() => {
                     setTargetBackup(backup); setTargetDatabase(database); setConfirmation(''); setRestoreOpen(true)
@@ -186,8 +225,10 @@ export function BackupsPageView() {
                     <RotateCcw className="h-3.5 w-3.5 text-foreground-lighter" />Restore backup
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-border-muted" />
-                  <DropdownMenuItem disabled title="The backup API has no delete endpoint." className="text-xs gap-2 text-destructive opacity-50">
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />Delete backup unavailable
+                  <DropdownMenuItem disabled={!!busy} onSelect={() => {
+                    setTargetBackup(backup); setConfirmation(''); setDeleteOpen(true)
+                  }} className="text-xs gap-2 text-destructive cursor-pointer">
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />Delete backup
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -240,6 +281,28 @@ export function BackupsPageView() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={deleteOpen} onOpenChange={open => {
+        if (busy) return
+        setDeleteOpen(open)
+        if (!open) { setTargetBackup(null); setConfirmation('') }
+      }}>
+        <DialogContent className="bg-surface-100 border-default text-foreground sm:max-w-md">
+          <form onSubmit={event => void handleDelete(event)} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Delete backup &quot;{targetBackup?.label}&quot;?</DialogTitle>
+              <DialogDescription>Permanently removes this backup archive and its metadata. This cannot be undone. The live database is not changed.</DialogDescription>
+            </DialogHeader>
+            <label className="block text-xs text-foreground-lighter">
+              Type <code>{targetBackup?.id}</code> to confirm
+              <Input aria-label="Confirm backup ID" value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={!!busy} className="mt-2 font-mono text-xs" />
+            </label>
+            <DialogFooter>
+              <Button type="button" variant="default" disabled={!!busy} onClick={() => { setDeleteOpen(false); setTargetBackup(null); setConfirmation('') }}>Cancel</Button>
+              <Button type="submit" variant="destructive" loading={busy === 'delete'} disabled={!!busy || confirmation !== targetBackup?.id}>Delete backup</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

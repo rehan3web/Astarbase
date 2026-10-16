@@ -6,6 +6,26 @@ import { confirmation, dbName } from '../validation.js';
 
 export function backupsController(services: Services) {
   return {
+    async download(req: Request, res: Response) {
+      const id = z.uuid().parse(req.params.id);
+      res.attachment(`backup-${id}.sql`).type('application/sql');
+      try {
+        await services.backups.download(id, res);
+        res.end();
+      } catch (error) {
+        if (res.headersSent) { res.destroy(); return; }
+        res.removeHeader('Content-Disposition');
+        res.type('application/json');
+        throw error;
+      }
+    },
+    async delete(req: Request, res: Response) {
+      const id = z.uuid().parse(req.params.id);
+      if (z.object({ confirmBackupId: z.uuid() }).strict().parse(req.body).confirmBackupId !== id) {
+        throw new HttpError(400, 'Confirm the exact backup ID to delete');
+      }
+      res.json(await services.backups.delete(id));
+    },
     async list(req: Request, res: Response) {
       const body = z.object({ database: dbName.optional() }).parse(req.query);
       res.json(await services.backups.list(body.database));

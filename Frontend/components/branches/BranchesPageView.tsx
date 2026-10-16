@@ -33,6 +33,7 @@ import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import { getTagBadgeStyle, isValidBranchTag } from '@/components/branches/branchTag'
+import { formatBytes } from '@/lib/dashboard-metrics'
 
 export function BranchesPageView() {
   const { branches, branch: activeBranch, selectBranch, reload } = useStudio()
@@ -201,9 +202,9 @@ export function BranchesPageView() {
               <div>
                 {branch.tag && <span className={`text-[10px] uppercase tracking-wider font-medium border rounded-full px-2 py-0.5 ${getTagBadgeStyle(branch.tag)}`}>{branch.tag}</span>}
               </div>
-              <div className="flex items-center gap-1.5 text-sm text-foreground-light" title="Storage usage is not returned by the live API">
+              <div data-branch-storage={branch.name} className="flex items-center gap-1.5 text-sm text-foreground-light" title={branch.storage_bytes == null ? 'Database storage could not be read' : `${branch.storage_bytes.toLocaleString()} bytes · PostgreSQL database size`}>
                 <HardDrive className="h-3 w-3 text-foreground-muted" />
-                <span className="font-mono text-xs">—</span>
+                <span className="font-mono text-xs">{formatBytes(branch.storage_bytes)}</span>
               </div>
               <span className="text-xs text-foreground-lighter font-mono">
                 {branch.created_at ? new Date(branch.created_at).toLocaleDateString() : '—'}

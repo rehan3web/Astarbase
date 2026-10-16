@@ -4,6 +4,11 @@ import { database } from '../validation.js';
 
 export function visualizerController(services: Services) {
   return {
+    async sql(req: Request, res: Response) {
+      const db = database(req);
+      await services.catalog.assertDatabase(db);
+      res.json(await services.postgres.schemaSql(db));
+    },
     async diagram(req: Request, res: Response) {
       const db = database(req);
       await services.catalog.assertDatabase(db);

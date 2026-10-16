@@ -3,6 +3,7 @@ import { HttpError } from '../../errors.js';
 import { Catalog } from '../admin/catalog.service.js';
 import { PostgresContainer } from '../docker/postgres.js';
 import { BranchService } from '../branches/branches.service.js';
+import type { Writable } from 'node:stream';
 
 export class BackupService {
   constructor(readonly catalog: Catalog, readonly postgres: PostgresContainer, readonly branches: BranchService) {}
@@ -30,6 +31,22 @@ export class BackupService {
       if (!this.catalog.store.backup(id)) throw new HttpError(404, 'Backup not found');
       const result = await this.branches.replace(database, id);
       return { restored: true, database, backupId: id, ...result };
+    });
+  }
+  async download(id: string, destination: Writable) {
+    return this.catalog.exclusive(async () => {
+      if (!this.catalog.store.backup(id)) throw new HttpError(404, 'Backup not found');
+      if (!(await this.postgres.listDumps()).has(id)) throw new HttpError(404, 'Backup archive is missing');
+      await this.postgres.exportSql(id, destination);
+    });
+  }
+  async delete(id: string) {
+    return this.catalog.exclusive(async () => {
+      if (!this.catalog.store.backup(id)) throw new HttpError(404, 'Backup not found');
+      // Remove the archive first: a filesystem failure must retain its metadata.
+      await this.postgres.removeDump(id);
+      this.catalog.store.deleteBackup(id);
+      return { deleted: true, backupId: id };
     });
   }
 }

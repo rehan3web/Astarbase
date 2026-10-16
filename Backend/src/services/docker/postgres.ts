@@ -1,9 +1,31 @@
 import type { Config } from '../../config.js';
 import { HttpError } from '../../errors.js';
 import { DockerService } from './docker.js';
+import type { Writable } from 'node:stream';
 
 export class PostgresContainer {
   constructor(readonly config: Config, readonly docker = new DockerService(config)) {}
+
+  async schemaSql(database: string) {
+    const { stdout } = await this.docker.exec([
+      'pg_dump', '--host', this.config.PG_SOCKET_DIR, '--username', this.config.DB_USER,
+      '--no-password', '--schema-only', '--no-owner', '--no-privileges',
+      '--no-publications', '--no-subscriptions', '--dbname', database,
+    ], 3600000, 64 * 1024 * 1024);
+    // Recent pg_dump versions surround scripts with psql-only restriction
+    // directives. Remove only the matching outer pair, not SQL/function bodies.
+    const lines = stdout.split('\n');
+    const command = (line: string) => line.trim() !== '' && !line.startsWith('--');
+    const first = lines.findIndex(command);
+    let last = lines.length - 1;
+    while (last >= 0 && !command(lines[last])) last--;
+    const restriction = first >= 0 ? /^\\restrict ([A-Za-z0-9]+)\r?$/.exec(lines[first]) : null;
+    if (restriction) {
+      if (lines[last].trim() !== `\\unrestrict ${restriction[1]}`) throw new Error('Schema export was incomplete');
+      lines[first] = ''; lines[last] = '';
+    }
+    return { database, sql: lines.join('\n') };
+  }
 
   async query(database: string, sql: string) {
     // With -c, psql sends the entire argument as SQL, unless it begins with a
@@ -43,6 +65,11 @@ export class PostgresContainer {
 
   async removeDump(id: string): Promise<void> {
     await this.docker.exec(['rm', '-f', '--', this.file(id)]);
+  }
+
+  async exportSql(id: string, destination: Writable): Promise<void> {
+    // Convert the saved custom archive, not the current live database.
+    await this.docker.execTo(['pg_restore', '--no-owner', '--no-privileges', '--file=-', this.file(id)], destination);
   }
 
   async listDumps(): Promise<Map<string, number>> {

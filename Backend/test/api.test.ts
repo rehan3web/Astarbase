@@ -24,7 +24,10 @@ function fixture() {
       branch: capture('branch', branch),
       assertDatabase: async (db: string) => { if (!['test_project', 'branch_dev'].includes(db)) throw new HttpError(404, 'Managed database not found'); },
     },
-    postgres: { query: capture('sql', { stdout: 'answer\n42\n', format: 'csv' }) },
+    postgres: {
+      query: capture('sql', { stdout: 'answer\n42\n', format: 'csv' }),
+      schemaSql: capture('schemaSql', { database: 'test_project', sql: 'CREATE TABLE public.items(id integer PRIMARY KEY);' }),
+    },
     tables: {
       list: capture('tables', [{ schema: 'public', name: 'items' }]),
       rows: capture('rows', { rows: [{ id: 1 }], total: '1' }),
@@ -33,6 +36,7 @@ function fixture() {
       delete: capture('delete', { id: 2 }),
     },
     branches: {
+      list: capture('branches', [{ ...branch, storage_bytes: 8192 }]),
       create: capture('createBranch', branch), refresh: capture('refresh', { branch }),
       updateTag: async (name: string, tag: string | null) => {
         calls.push(['updateBranchTag', name, tag]);
@@ -43,6 +47,10 @@ function fixture() {
     backups: {
       list: capture('backups', []), create: capture('createBackup', { id: 'backup-id' }),
       restore: capture('restore', { restored: true }),
+      download: async (id: string, destination: { write(text: string): unknown }) => {
+        calls.push(['downloadBackup', id]); destination.write('-- PostgreSQL database dump\nSELECT 42;\n');
+      },
+      delete: capture('deleteBackup', { deleted: true }),
     },
     schema: { diagram: capture('schema', { nodes: [], edges: [] }) },
   } as unknown as Services;
@@ -125,6 +133,11 @@ test('branch tag endpoints validate create/edit/remove, auth, and unknown branch
 test('schema and backup endpoints validate creation, listing and restore', async () => {
   const { app, auth, calls } = fixture();
   await request(app).get('/api/databases/test_project/schema').set(auth).expect(200, { nodes: [], edges: [] });
+  await request(app).get('/api/databases/test_project/schema/sql').expect(401);
+  const schemaSql = await request(app).get('/api/databases/test_project/schema/sql').set(auth).expect(200);
+  assert.match(schemaSql.body.sql, /CREATE TABLE/);
+  assert.equal(schemaSql.body.database, 'test_project');
+  await request(app).get('/api/databases/unmanaged/schema/sql').set(auth).expect(404);
   await request(app).get('/api/backups?database=test_project').set(auth).expect(200);
   await request(app).post('/api/backups').set(auth).send({ database: 'test_project', label: 'Before migration' }).expect(201);
   const id = '01234567-1234-4567-8901-012345678901';
@@ -132,6 +145,15 @@ test('schema and backup endpoints validate creation, listing and restore', async
   await request(app).post(`/api/backups/${id}/restore`).set(auth).send({ database: 'test_project', confirmDatabase: 'test_project' }).expect(200);
   assert.deepEqual(calls.at(-1), ['restore', id, 'test_project']);
   await request(app).post('/api/backups/bad/restore').set(auth).send({ database: 'test_project', confirmDatabase: 'test_project' }).expect(400);
+  await request(app).get(`/api/backups/${id}/download`).expect(401);
+  const download = await request(app).get(`/api/backups/${id}/download`).set(auth).expect(200);
+  assert.match(download.headers['content-disposition'], /attachment;.*\.sql/);
+  assert.match(download.text, /PostgreSQL database dump/);
+  await request(app).get('/api/backups/bad/download').set(auth).expect(400);
+  await request(app).delete(`/api/backups/${id}`).set(auth).send({}).expect(400);
+  await request(app).delete(`/api/backups/${id}`).set(auth).send({ confirmBackupId: '11234567-1234-4567-8901-012345678901' }).expect(400);
+  await request(app).delete(`/api/backups/${id}`).set(auth).send({ confirmBackupId: id }).expect(200);
+  assert.deepEqual(calls.at(-1), ['deleteBackup', id]);
 });
 
 test('errors redact credentials and unhealthy dependencies return 503', async () => {

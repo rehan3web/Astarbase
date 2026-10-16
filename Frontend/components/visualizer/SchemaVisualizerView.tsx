@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -45,6 +45,7 @@ import { useStudio } from '@/components/providers/StudioProvider'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import { api, Diagram, SchemaEdge, SchemaNode, errorMessage } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { copyText } from '@/lib/copy-text'
 
 type TableNodeData = {
   table: SchemaNode
@@ -164,31 +165,6 @@ function escapeXml(value: string) {
   return value.replace(/[<>&'"]/g, character => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[character]!)
 }
 
-function generateSql(tables: SchemaNode[], edges: SchemaEdge[], schemaName: string): string {
-  const lines = [`-- Schema: ${schemaName}`, `-- Generated on ${new Date().toLocaleDateString()}`, '']
-  tables.forEach(table => {
-    lines.push(`CREATE TABLE "${table.schema.replaceAll('"', '""')}"."${table.name.replaceAll('"', '""')}" (`)
-    const definitions = table.columns.map(column => {
-      let definition = `  "${column.name.replaceAll('"', '""')}" ${column.type}`
-      if (table.primaryKey.includes(column.name)) definition += ' PRIMARY KEY'
-      if (column.default) definition += ` DEFAULT ${column.default}`
-      const foreignKey = edges.find(edge =>
-        edge.source_schema === table.schema
-        && edge.source_table === table.name
-        && edge.source_columns.includes(column.name)
-      )
-      const sourceIndex = foreignKey?.source_columns.indexOf(column.name) ?? -1
-      const targetColumn = sourceIndex >= 0 ? foreignKey?.target_columns[sourceIndex] : undefined
-      if (foreignKey && targetColumn) {
-        definition += ` REFERENCES "${foreignKey.target_schema.replaceAll('"', '""')}"."${foreignKey.target_table.replaceAll('"', '""')}" ("${targetColumn.replaceAll('"', '""')}")`
-      }
-      return definition
-    })
-    lines.push(definitions.join(',\n'), ');\n')
-  })
-  return lines.join('\n')
-}
-
 function generateMarkdown(tables: SchemaNode[], edges: SchemaEdge[], schemaName: string): string {
   const lines = [`# Schema: ${schemaName}\n`]
   tables.forEach(table => {
@@ -285,6 +261,17 @@ function SchemaVisualizerInner() {
   const [searchQuery, setSearchQuery] = useState('')
   const [errorMessageText, setErrorMessageText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [copyingSql, setCopyingSql] = useState(false)
+  const copyRequest = useRef<AbortController | null>(null)
+  const currentDatabase = useRef(database)
+  currentDatabase.current = database
+  useEffect(() => {
+    setCopyingSql(false)
+    return () => {
+      copyRequest.current?.abort()
+      copyRequest.current = null
+    }
+  }, [database])
 
   const loadSchema = useCallback(async (signal?: AbortSignal, announce = false) => {
     setIsLoading(true); setErrorMessageText('')
@@ -370,17 +357,31 @@ function SchemaVisualizerInner() {
   }
 
   const handleCopyAsSql = useCallback(async () => {
-    if (!liveDiagram) return
+    if (!liveDiagram || copyRequest.current) return
+    const controller = new AbortController()
+    copyRequest.current = controller
+    setCopyingSql(true); setErrorMessageText('')
     try {
-      await navigator.clipboard.writeText(generateSql(schemaTables, schemaEdges, selectedSchema))
-      notify('Copied SQL schema to clipboard!')
-    } catch (error) { const message = errorMessage(error); setErrorMessageText(message); notify(message, 'error') }
-  }, [liveDiagram, schemaTables, schemaEdges, selectedSchema, notify])
+      const result = await api<{ database: string; sql: string }>(
+        `/databases/${encodeURIComponent(database)}/schema/sql`, { signal: controller.signal },
+      )
+      if (controller.signal.aborted || currentDatabase.current !== database) return
+      if (result.database !== database || typeof result.sql !== 'string' || !result.sql.trim()) throw new Error('No SQL schema was returned')
+      await copyText(result.sql)
+      if (!controller.signal.aborted && currentDatabase.current === database) notify('Copied SQL schema for all tables!')
+    } catch (error) {
+      if (!controller.signal.aborted && currentDatabase.current === database) {
+        const message = errorMessage(error); setErrorMessageText(message); notify(message, 'error')
+      }
+    } finally {
+      if (copyRequest.current === controller) { copyRequest.current = null; setCopyingSql(false) }
+    }
+  }, [database, liveDiagram, notify])
 
   const handleCopyAsMarkdown = useCallback(async () => {
     if (!liveDiagram) return
     try {
-      await navigator.clipboard.writeText(generateMarkdown(schemaTables, schemaEdges, selectedSchema))
+      await copyText(generateMarkdown(schemaTables, schemaEdges, selectedSchema))
       notify('Copied Markdown schema to clipboard!')
     } catch (error) { const message = errorMessage(error); setErrorMessageText(message); notify(message, 'error') }
   }, [liveDiagram, schemaTables, schemaEdges, selectedSchema, notify])
@@ -436,8 +437,8 @@ function SchemaVisualizerInner() {
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex items-center rounded-md border border-strong bg-surface-100 overflow-hidden shadow-xs">
-            <button type="button" onClick={() => void handleCopyAsSql()} disabled={!liveDiagram} className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-foreground hover:bg-surface-200 transition-colors cursor-pointer disabled:opacity-50" title="Copy schema as SQL">
-              <Copy className="h-3.5 w-3.5 text-foreground-light shrink-0" /><span>Copy as SQL</span>
+            <button type="button" onClick={() => void handleCopyAsSql()} disabled={!liveDiagram || copyingSql} className="h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-foreground hover:bg-surface-200 transition-colors cursor-pointer disabled:opacity-50" title="Copy actual SQL schema for all tables in this database">
+              <Copy className="h-3.5 w-3.5 text-foreground-light shrink-0" /><span>{copyingSql ? 'Copying…' : 'Copy as SQL'}</span>
             </button>
             <div className="w-[1px] h-4 bg-border-strong self-center" />
             <DropdownMenu>

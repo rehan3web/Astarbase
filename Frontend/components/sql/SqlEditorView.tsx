@@ -313,18 +313,35 @@ export function SqlEditorView() {
   const updateSnippet = async (snippetId: string, patch: Partial<SqlSnippet>) => {
     const target = snippetsRef.current.find((item) => item.id === snippetId)
     if (!target) return
-    if (libraryMutationLock.current) {
-      notify('A snippet library change is already in progress', 'warning')
-      return
-    }
-    if (isScratchSnippet(target)) {
-      setSnippetsSnapshot(snippetsRef.current.map((item) => item.id === snippetId ? { ...item, ...patch } : item))
-      return
-    }
     if (!beginLibraryMutation()) return
+    const wasScratch = isScratchSnippet(target)
+    const savedSql = draftSqlMapRef.current[snippetId]
+      ?? (activeSnippetIdRef.current === snippetId ? currentSqlRef.current : target.sql)
+    const previousIds = new Set(snippetsRef.current.map((item) => item.id))
     try {
-      const library = await api<SqlLibrary>(`/sql/snippets/${encodeURIComponent(snippetId)}`, { method: 'PATCH', body: patch })
-      applyLibrary(library)
+      const library = await api<SqlLibrary>(
+        wasScratch ? '/sql/snippets' : `/sql/snippets/${encodeURIComponent(snippetId)}`,
+        {
+          method: wasScratch ? 'POST' : 'PATCH',
+          body: wasScratch ? {
+            name: target.name, sql: savedSql, description: target.description ?? '',
+            visibility: target.visibility ?? 'private', folderId: target.folderId ?? null,
+            isFavorite: target.isFavorite ?? false, ...patch,
+          } : patch,
+        }
+      )
+      const updated = library.snippets.find((item) => wasScratch ? !previousIds.has(item.id) : item.id === snippetId)
+      if (!updated) throw new Error('Updated snippet was not returned by the library')
+      applyLibrary(library, wasScratch ? [snippetId] : [])
+      if (wasScratch) {
+        const nextDrafts = { ...draftSqlMapRef.current }
+        const latestDraft = nextDrafts[snippetId]
+        delete nextDrafts[snippetId]
+        if (latestDraft !== undefined && latestDraft !== savedSql) nextDrafts[updated.id] = latestDraft
+        setDraftSqlSnapshot(nextDrafts)
+        setOpenTabIds((previous) => previous.map((id) => id === snippetId ? updated.id : id))
+        if (activeSnippetIdRef.current === snippetId) setActiveSnippetSnapshot(updated.id)
+      }
       notify('Snippet updated')
     } catch (error) {
       notify(errorMessage(error), 'error')

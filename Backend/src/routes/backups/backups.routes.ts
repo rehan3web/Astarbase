@@ -8,5 +8,7 @@ export function backupsRoutes(services: Services) {
   router.get('/', controller.list);
   router.post('/', controller.create);
   router.post('/:id/restore', controller.restore);
+  router.get('/:id/download', controller.download);
+  router.delete('/:id', controller.delete);
   return router;
 }

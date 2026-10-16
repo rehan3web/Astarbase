@@ -14,7 +14,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   }
   return data as T
 }
-export type Branch = { name: string; database_name: string; parent_name: string | null; tag: string | null; created_at: string; refreshed_at: string | null }
+export type Branch = { name: string; database_name: string; parent_name: string | null; tag: string | null; created_at: string; refreshed_at: string | null; storage_bytes?: number | null }
 export type AdminSettings = { projectName: string; defaultRowLimit: number; theme: 'system' | 'light' | 'dark' }
 export type SqlResponse = { stdout: string; stderr: string; format: string; durationMs: number }
 export type Column = { name: string; type: string; udt_name: string; nullable: boolean; generated: boolean; identity: string; default: string | null }

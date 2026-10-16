@@ -7,6 +7,15 @@ import { PostgresContainer } from '../docker/postgres.js';
 
 export class BranchService {
   constructor(readonly catalog: Catalog, readonly postgres: PostgresContainer) {}
+  async list() {
+    const branches = await this.catalog.branches();
+    const sizes = await this.admin(client => client.query<{ datname: string; storage_bytes: string }>(
+      'SELECT datname, pg_database_size(oid)::text AS storage_bytes FROM pg_database WHERE datname = ANY($1::text[])',
+      [branches.map(branch => branch.database_name)],
+    ));
+    const byDatabase = new Map(sizes.rows.map(row => [row.datname, Number(row.storage_bytes)]));
+    return branches.map(branch => ({ ...branch, storage_bytes: byDatabase.get(branch.database_name) ?? null }));
+  }
   private admin<T>(fn: Parameters<typeof withDatabase<T>>[2]) {
     return withDatabase(this.catalog.config, 'postgres', fn);
   }

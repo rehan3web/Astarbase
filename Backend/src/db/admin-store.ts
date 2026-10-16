@@ -131,6 +131,9 @@ export class AdminStore {
       .run(id, database, label, size, new Date().toISOString());
     return this.backup(id)!;
   }
+  deleteBackup(id: string) {
+    this.db.prepare('DELETE FROM backups WHERE id=?').run(id);
+  }
   settings(): AdminSettings {
     const rows = this.db.prepare('SELECT key,value FROM admin_settings').all();
     return settingsSchema.parse({ ...defaults, ...Object.fromEntries(rows.map(row => [row.key, JSON.parse(String(row.value))])) });

@@ -24,13 +24,43 @@ export async function verifySqlLibrary(page: Page, url: string, setQuery: (sql: 
   const menu = async (name: string) => sidebar.getByText(name, { exact: true }).first().click({ button: 'right' })
   const save = () => page.getByTitle('Save query (Ctrl+S)').click()
 
+  await expect(page.getByText('Loading saved snippets…', { exact: true })).toHaveCount(0)
+  // Metadata actions must also persist the initial scratch document without Save.
+  for (const action of ['Add to favorites', 'Share with team']) {
+    await setQuery('SELECT 123 AS scratch_metadata;')
+    await menu('Untitled query')
+    const created = await change(() => page.getByRole('button', { name: action, exact: true }).click())
+    const snippet = created.snippets.find(s => s.sql.includes('scratch_metadata'))!
+    assert.ok(snippet, 'Metadata action must create a SQLite snippet')
+    assert.equal(snippet.isFavorite, action === 'Add to favorites')
+    assert.equal(snippet.visibility, action === 'Share with team' ? 'shared' : 'private')
+    await page.reload()
+    await expect(page.getByText('Loading saved snippets…', { exact: true })).toHaveCount(0)
+    await expect(sidebar.getByText('Untitled query', { exact: true }).first()).toBeVisible()
+    assert.deepEqual((await read()).snippets.find(s => s.id === snippet.id), snippet)
+    const deleted = await page.request.delete(`${url}/api/studio/sql/snippets/${snippet.id}`, { headers: { Origin: url } })
+    assert.equal(deleted.status(), 200)
+    await page.reload()
+    await expect(page.getByText('Loading saved snippets…', { exact: true })).toHaveCount(0)
+    await expect(sidebar.getByText('Untitled query', { exact: true }).first()).toBeVisible()
+  }
+
   await setQuery('SELECT 314159 AS saved_snippet;')
-  let library = await change(save)
-  const firstId = library.snippets.find(s => s.sql.includes('314159'))!.id
+  // A failed initial metadata save must not claim success or discard the draft.
+  await page.route('**/api/studio/sql/snippets', route => route.fulfill({
+    status: 503, contentType: 'application/json', body: '{"error":"Metadata save unavailable"}',
+  }))
+  await menu('Untitled query')
+  await page.getByRole('button', { name: 'Add to favorites', exact: true }).click()
+  await expect(page.locator('[data-studio-toast][role="alert"]').filter({ hasText: 'Metadata save unavailable' })).toBeVisible()
+  assert.equal((await read()).snippets.length, 0)
+  await expect(page.locator('.view-lines')).toContainText('314159')
+  await page.unroute('**/api/studio/sql/snippets')
   await menu('Untitled query')
   await page.getByRole('button', { name: 'Rename', exact: true }).click()
   await sidebar.getByRole('textbox').last().fill('Saved browser SQL')
-  library = await change(() => sidebar.getByRole('textbox').last().press('Enter'))
+  let library = await change(() => sidebar.getByRole('textbox').last().press('Enter'))
+  const firstId = library.snippets.find(s => s.sql.includes('314159'))!.id
   assert.equal(library.snippets.find(s => s.id === firstId)?.name, 'Saved browser SQL')
   await menu('Saved browser SQL')
   library = await change(() => page.getByRole('button', { name: 'Add to favorites', exact: true }).click())

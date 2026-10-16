@@ -7,7 +7,7 @@ import { branchTagSchema } from '../../db/admin-store.js';
 
 export function branchesController(services: Services) {
   return {
-    async list(_req: Request, res: Response) { res.json(await services.catalog.branches()); },
+    async list(_req: Request, res: Response) { res.json(await services.branches.list()); },
     async create(req: Request, res: Response) {
       const body = z.object({
         name: branchName.refine(name => name !== 'main', 'main is reserved'),
