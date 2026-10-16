@@ -3,6 +3,15 @@
 Single-machine Admin Studio with a connected Next.js frontend, Node.js/TypeScript
 backend, Postgres, PgBouncer, and SQLite admin settings.
 
+The SQL Editor saves named snippets, SQL text, folders, favorites and
+Private/Shared organization in the existing `Backend/data/admin.sqlite`.
+Use **Save** (or Ctrl+S) to persist editor changes. New snippets and folders,
+renames, favorites and visibility changes survive reloads and container
+restarts through the existing admin-data volume. Deleting a folder keeps its
+queries outside the folder. Private and Shared are authenticated Studio library
+groups for this single-admin installation; Shared never means anonymous access.
+Saving a snippet does not execute it; use **Run** separately.
+
 Backend and PgBouncer startup logic use Node.js 24 + TypeScript. No Python
 interpreter, scripts or dependencies are required by the Docker stack.
 

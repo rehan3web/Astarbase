@@ -4,19 +4,14 @@ import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Plus,
-  Box,
-  BookOpen,
   GitBranch,
   Home,
-  LayoutDashboard,
   Moon,
+  LogOut,
   Settings,
   Sun,
-  Table2 as Table,
 } from 'lucide-react'
 import {
-  SupabaseLogo,
   TableEditorIcon,
   SqlEditorIcon,
   SchemaVisualizerIcon,
@@ -24,11 +19,28 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import { cn } from '@/lib/utils'
+import { useNotifications } from '@/components/providers/NotificationProvider'
+import { useState } from 'react'
 
 export function AppSidebar() {
   const pathname = usePathname()
   const { theme, toggleTheme } = useTheme()
-  const isDark = theme === 'dark'
+  const { notify } = useNotifications()
+  const [signingOut, setSigningOut] = useState(false)
+
+  const handleSignOut = async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      const response = await fetch('/api/session', { method: 'DELETE', credentials: 'same-origin' })
+      if (!response.ok) throw new Error('Could not sign out')
+      notify('Signed out successfully')
+      window.setTimeout(() => window.location.reload(), 500)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not sign out', 'error')
+      setSigningOut(false)
+    }
+  }
 
   const navItems = [
     {
@@ -161,20 +173,6 @@ export function AppSidebar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <a
-                href="https://supabase.com/docs"
-                target="_blank"
-                rel="noreferrer"
-                className="w-8 h-8 rounded-md flex items-center justify-center text-foreground-lighter hover:text-foreground hover:bg-surface-100 transition-colors"
-              >
-                <BookOpen className="h-4 w-4" />
-              </a>
-            </TooltipTrigger>
-            <TooltipContent side="right">Documentation</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
               <Link
                 href="/settings"
                 className={cn(
@@ -188,6 +186,21 @@ export function AppSidebar() {
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right">Project Settings</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                disabled={signingOut}
+                aria-label="Sign out"
+                className="w-8 h-8 rounded-md flex items-center justify-center text-foreground-lighter hover:text-foreground hover:bg-surface-100 transition-colors disabled:opacity-50"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{signingOut ? 'Signing out…' : 'Sign out'}</TooltipContent>
           </Tooltip>
         </div>
       </aside>

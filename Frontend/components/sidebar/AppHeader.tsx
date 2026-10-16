@@ -8,7 +8,6 @@ import { ConnectPopover } from '@/components/interfaces/ConnectPopover'
 import { BranchSwitcher } from '@/components/interfaces/BranchSwitcher'
 import { SupabaseLogo } from '@/components/ui/icons'
 import { useStudio } from '@/components/providers/StudioProvider'
-import { useNotifications } from '@/components/providers/NotificationProvider'
 
 const DatabaseLogo = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="60 90 270 270" className={className}>
@@ -22,7 +21,6 @@ const DatabaseLogo = ({ className }: { className?: string }) => (
 
 export function AppHeader({ title }: { title?: string }) {
   const { database: dbName, settings } = useStudio()
-  const { notify } = useNotifications()
 
   return (
     <header className="h-12 shrink-0 border-b border-default bg-dash-sidebar flex items-center justify-between px-4 z-20">
@@ -66,14 +64,6 @@ export function AppHeader({ title }: { title?: string }) {
       {/* Right Actions */}
       <div className="flex items-center gap-3">
         <CommandPalette />
-        <button className="text-xs text-foreground-lighter" onClick={async () => {
-          try {
-            const response = await fetch('/api/session', { method: 'DELETE' })
-            if (!response.ok) throw new Error('Could not sign out')
-            notify('Signed out successfully')
-            window.setTimeout(() => window.location.reload(), 500)
-          } catch (error) { notify(error instanceof Error ? error.message : 'Could not sign out', 'error') }
-        }}>Sign out</button>
       </div>
     </header>
   )

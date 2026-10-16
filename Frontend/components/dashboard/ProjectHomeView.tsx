@@ -23,15 +23,23 @@ export function ProjectHomeView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const load = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true); setError('')
-    try { const value = await api<Diagram>(`/databases/${encodeURIComponent(database)}/schema`, { signal }); if (!signal?.aborted) setCatalog(value) }
-    catch (e) { if (!signal?.aborted) setError(errorMessage(e)) }
-    finally { if (!signal?.aborted) setLoading(false) }
+    setLoading(true)
+    setError('')
+    try {
+      const value = await api<Diagram>(`/databases/${encodeURIComponent(database)}/schema`, { signal })
+      if (!signal?.aborted) setCatalog(value)
+    } catch (cause) {
+      if (!signal?.aborted) setError(errorMessage(cause))
+    } finally {
+      if (!signal?.aborted) setLoading(false)
+    }
   }, [database])
-  useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort() }, [load])
+  useEffect(() => {
+    const controller = new AbortController()
+    void load(controller.signal)
+    return () => controller.abort()
+  }, [load])
   const hasCatalog = catalog?.database === database
-  const liveTables = hasCatalog ? catalog.nodes.length : undefined
-  const liveRelations = hasCatalog ? catalog.edges.length : undefined
   return (
     <div className="flex-1 overflow-y-auto bg-studio p-6 md:p-8 space-y-8">
       {/* Top Banner & Project Overview — same original composition, live values only */}
@@ -41,7 +49,7 @@ export function ProjectHomeView() {
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">{settings?.projectName || 'Astarbase'}</h1>
             <Badge variant="brand" className="text-xs px-2 py-0.5">{branch?.name || 'Connected'}</Badge>
           </div>
-          <p className="text-sm text-foreground-lighter mt-1 flex items-center gap-2"><span className="font-mono">{database}</span><span>·</span><span>{loading ? 'Reading live catalog…' : hasCatalog ? `${liveTables} tables · ${liveRelations} relationships` : 'Catalog unavailable'}</span><span>·</span><span>{branches.length} managed databases</span></p>
+          <p className="text-sm text-foreground-lighter mt-1 flex items-center gap-2"><span className="font-mono">{database}</span><span>·</span><span>{loading ? 'Reading live catalog…' : hasCatalog ? 'Live catalog connected' : 'Catalog unavailable'}</span><span>·</span><span>{branches.length} managed databases</span></p>
         </div>
       </div>
 

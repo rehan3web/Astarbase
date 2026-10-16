@@ -14,6 +14,7 @@ import { createApp, createServices, type Services } from '../../Backend/src/inde
 import { pushDatabase } from '../../Backend/src/db/push'
 import { withDatabase, quoteIdentifier } from '../../Backend/src/db/socket'
 import { startAdminListeners } from '../../Backend/src/services/system/listener.service'
+import { verifySqlLibrary } from './sql-library.browser'
 
 async function main() {
 const run = promisify(execFile)
@@ -122,6 +123,13 @@ try {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Active branch', exact: true })).toBeVisible()
   await snapshot('home')
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true })
+  assert.equal(await signOut.evaluate(button => Boolean(button.closest('aside'))), true)
+  const signOutBox = await signOut.boundingBox()
+  const settingsBox = await page.locator('aside a[href="/settings"]').boundingBox()
+  assert.ok(signOutBox && settingsBox && signOutBox.y > settingsBox.y)
+  await expect(page.getByText(/\d+ tables · \d+ relationships/)).toHaveCount(0)
+  assert.equal(await page.locator('aside').getByText('Documentation', { exact: true }).count(), 0)
   const cookie = (await page.context().cookies()).find(c => c.name === 'astarbase_session')
   assert.ok(cookie?.httpOnly)
   assert.equal(cookie?.value.includes(token), false)
@@ -161,6 +169,12 @@ try {
   await page.getByTitle('Run query (Ctrl+Enter)').click()
   await expectToast(/no_such_table.*does not exist/, true)
   console.log('PASS: SQL results and actual SQL error rendering')
+  await verifySqlLibrary(page, url, setQuery)
+  await snapshot('sql-library')
+  if (process.env.STUDIO_SQL_LIBRARY_ONLY === '1') {
+    assert.deepEqual(browserErrors, [])
+    return
+  }
 
   await page.goto(`${url}/tables`)
   await page.getByText('items', { exact: true }).first().click()

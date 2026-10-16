@@ -1,3 +1,4 @@
+import { SqlLibraryStore } from './sql-library.js';
 import { DatabaseSync } from 'node:sqlite';
 import { chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -27,6 +28,7 @@ const defaults: AdminSettings = { projectName: 'Astarbase', defaultRowLimit: 100
 // schemas stay in Postgres; pg_dump archives stay in Backend/backups.
 export class AdminStore {
   readonly file: string;
+  readonly sqlLibrary: SqlLibraryStore;
   private db: DatabaseSync;
 
   constructor(config: Config) {
@@ -60,6 +62,7 @@ export class AdminStore {
         created_at TEXT NOT NULL
       );
     `);
+    this.sqlLibrary = new SqlLibraryStore(this.db);
     // Add metadata in-place for existing installations. Check under the write
     // lock so concurrent Studio starts cannot both attempt the same ALTER.
     this.transaction(() => {
@@ -130,7 +133,8 @@ export class AdminStore {
     return settingsSchema.parse({ ...defaults, ...Object.fromEntries(rows.map(row => [row.key, JSON.parse(String(row.value))])) });
   }
   updateSettings(changes: Partial<AdminSettings>): AdminSettings {
-    // Strict allowlist keeps passwords, tokens, arbitrary SQL and dumps out of SQLite.
+    // Keep credentials, SQL and dumps out of the settings map. Saved editor SQL
+    // belongs only in the dedicated snippet library, never query result rows.
     settingsSchema.partial().parse(changes);
     this.transaction(() => {
       const stmt = this.db.prepare('INSERT INTO admin_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');

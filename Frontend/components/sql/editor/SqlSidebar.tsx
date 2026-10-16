@@ -159,6 +159,7 @@ export function SqlSidebar({
     name?: string
   } | null>(null)
   const [modalInputValue, setModalInputValue] = useState('')
+  const [newFolderVisibility, setNewFolderVisibility] = useState<'private' | 'shared'>('private')
 
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -209,6 +210,8 @@ export function SqlSidebar({
 
   // Categorize snippets
   const sharedSnippets = filteredSnippets.filter((s) => s.visibility === 'shared')
+  const sharedFolders = folders.filter((folder) => folder.visibility === 'shared')
+  const sharedRootSnippets = sharedSnippets.filter((snippet) => !snippet.folderId)
   const favoriteSnippets = filteredSnippets.filter((s) => s.isFavorite)
   const privateSnippets = filteredSnippets.filter((s) => s.visibility !== 'shared')
 
@@ -222,7 +225,7 @@ export function SqlSidebar({
 
     if (modalState.type === 'create_folder') {
       const name = modalInputValue.trim() || 'New folder'
-      onCreateFolder?.(name, 'private')
+      onCreateFolder?.(name, newFolderVisibility)
     } else if (modalState.type === 'delete_folder' && modalState.id) {
       onDeleteFolder?.(modalState.id)
     } else if (modalState.type === 'delete_snippet' && modalState.id) {
@@ -370,12 +373,24 @@ export function SqlSidebar({
             <DropdownMenuItem
               onClick={() => {
                 setModalInputValue('New folder')
+                setNewFolderVisibility('private')
                 setModalState({ type: 'create_folder' })
               }}
               className="gap-2 cursor-pointer text-xs"
             >
               <FolderPlus className="h-3.5 w-3.5" />
               <span>Create new folder</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setModalInputValue('New shared folder')
+                setNewFolderVisibility('shared')
+                setModalState({ type: 'create_folder' })
+              }}
+              className="gap-2 cursor-pointer text-xs"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              <span>Create shared folder</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -399,7 +414,43 @@ export function SqlSidebar({
 
           {openSections.shared && (
             <div className="mt-0.5">
-              {sharedSnippets.length === 0 ? (
+              {sharedFolders.map((folder) => {
+                const isFolderOpen = !!openFolders[folder.id]
+                const children = sharedSnippets.filter((snippet) => snippet.folderId === folder.id)
+                return (
+                  <div key={folder.id}>
+                    <div
+                      onClick={() => toggleFolder(folder.id)}
+                      onContextMenu={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 200), y: Math.min(event.clientY, window.innerHeight - 200), type: 'folder', id: folder.id })
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-foreground hover:bg-surface-100 transition-colors cursor-pointer select-none group"
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        {isFolderOpen ? <ChevronDown className="h-3.5 w-3.5 text-foreground-lighter" /> : <ChevronRight className="h-3.5 w-3.5 text-foreground-lighter" />}
+                        {isFolderOpen ? <FolderOpen className="h-3.5 w-3.5 text-foreground-lighter" /> : <Folder className="h-3.5 w-3.5 text-foreground-lighter" />}
+                        <span className="truncate font-medium">{folder.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`Options for ${folder.name}`}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          const rect = event.currentTarget.getBoundingClientRect()
+                          setContextMenu({ x: Math.min(rect.left, window.innerWidth - 200), y: Math.min(rect.bottom + 4, window.innerHeight - 200), type: 'folder', id: folder.id })
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-surface-200 rounded text-foreground-lighter hover:text-foreground"
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                      </button>
+                    </div>
+                    {isFolderOpen && (children.length ? children.map((snippet) => renderSnippetRow(snippet, true)) : <div className="pl-8 pr-3 py-1 text-[11px] text-foreground-muted italic">Empty folder</div>)}
+                  </div>
+                )
+              })}
+              {sharedRootSnippets.length === 0 && sharedFolders.length === 0 ? (
                 <div className="mx-3 my-1.5 p-4 rounded-lg border border-strong bg-surface-100/50 text-center flex flex-col items-center justify-center select-none">
                   <span className="text-xs font-medium text-foreground">
                     No shared queries
@@ -409,7 +460,7 @@ export function SqlSidebar({
                   </p>
                 </div>
               ) : (
-                sharedSnippets.map((snip) => renderSnippetRow(snip))
+                sharedRootSnippets.map((snip) => renderSnippetRow(snip))
               )}
             </div>
           )}
@@ -716,7 +767,7 @@ export function SqlSidebar({
 
           {modalState?.type === 'delete_folder' ? (
             <p className="text-xs text-foreground-lighter py-2">
-              Are you sure you want to delete <span className="font-semibold text-foreground">"{modalState?.name}"</span> and all queries inside it? This action cannot be undone.
+              Are you sure you want to delete <span className="font-semibold text-foreground">"{modalState?.name}"</span>? Queries inside will be kept and moved out of the folder.
             </p>
           ) : modalState?.type === 'delete_snippet' ? (
             <p className="text-xs text-foreground-lighter py-2">

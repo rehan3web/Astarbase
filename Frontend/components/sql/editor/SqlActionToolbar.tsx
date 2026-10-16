@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils'
 
 interface SqlActionToolbarProps {
   isExecuting: boolean
+  isSaving?: boolean
+  isLibraryBusy?: boolean
   hasUnsavedEdits?: boolean
   onRunQuery: () => void
   onFormatQuery: () => void
@@ -24,6 +26,8 @@ interface SqlActionToolbarProps {
 
 export function SqlActionToolbar({
   isExecuting,
+  isSaving = false,
+  isLibraryBusy = false,
   hasUnsavedEdits = false,
   onRunQuery,
   onFormatQuery,
@@ -38,6 +42,11 @@ export function SqlActionToolbar({
       {hasUnsavedEdits && (
         <span className="text-xs text-foreground-lighter font-normal tracking-tight">
           Unsaved edits
+        </span>
+      )}
+      {isLibraryBusy && (
+        <span className="text-xs text-foreground-lighter font-normal tracking-tight" role="status">
+          Updating snippet library…
         </span>
       )}
 
@@ -92,10 +101,11 @@ export function SqlActionToolbar({
         <button
           type="button"
           onClick={onSave}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-surface-100 hover:bg-surface-200 text-foreground transition-colors cursor-pointer border-r border-strong active:bg-surface-300"
+          disabled={isSaving}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-surface-100 hover:bg-surface-200 text-foreground transition-colors cursor-pointer border-r border-strong active:bg-surface-300 disabled:opacity-60 disabled:cursor-wait"
           title="Save query (Ctrl+S)"
         >
-          <span>Save</span>
+          <span>{isSaving ? 'Saving…' : 'Save'}</span>
           <kbd className="text-[10px] text-foreground-lighter font-mono">Ctrl S</kbd>
         </button>
 
