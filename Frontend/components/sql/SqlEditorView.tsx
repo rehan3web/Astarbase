@@ -10,7 +10,7 @@ import { SqlResultsPane, QueryResult } from '@/components/sql/result/SqlResultsP
 import { downloadResultsAsCsv } from '@/components/sql/export/SqlExportUtils'
 import { api, SqlResponse, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
-import { parseSqlOutput } from '@/lib/sql-results'
+import { parseSqlExecutionOutput } from '@/lib/sql-results'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 
 type SqlLibrary = { folders: SqlFolder[]; snippets: SqlSnippet[] }
@@ -233,13 +233,11 @@ export function SqlEditorView() {
     try {
       const result = await api<SqlResponse>('/sql', { method: 'POST', body: { database, sql: currentSql } })
       if (version !== executionVersion.current) return
-      const parsed = currentSql.trim().replace(/;$/, '').includes(';')
-        ? { columns: ['output'], rows: [{ output: result.stdout }] }
-        : parseSqlOutput(result.stdout)
+      const parsed = parseSqlExecutionOutput(currentSql, result.stdout)
       setRawOutput(`${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`)
-      setQueryResult({ ...parsed, executionTimeMs: result.durationMs, rowCount: parsed.rows.length, status: 'success', message: result.stderr || (parsed.rows.length ? undefined : result.stdout) })
+      setQueryResult({ ...parsed, executionTimeMs: result.durationMs, rowCount: parsed.rows.length, status: 'success', message: parsed.rows.length ? (result.stderr || undefined) : 'Query executed successfully' })
       setActiveBottomTab('results')
-      notify('Query completed')
+      notify('Query executed successfully')
     } catch (error) {
       if (version !== executionVersion.current) return
       setQueryResult({ columns: [], rows: [], executionTimeMs: 0, rowCount: 0, status: 'error', message: errorMessage(error) })

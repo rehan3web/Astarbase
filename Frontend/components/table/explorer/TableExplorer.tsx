@@ -152,9 +152,10 @@ export function TableExplorer({
           return (
             <div
               key={tbl.id}
+              data-table-explorer-row={tbl.name}
               onClick={() => onSelectTable(tbl)}
               className={cn(
-                'w-full flex items-center justify-between px-3.5 py-1.5 text-xs transition-colors cursor-pointer group text-left font-mono border-y border-x-0',
+                'w-full flex items-center justify-between px-3.5 py-1.5 text-xs transition-none cursor-pointer group text-left font-mono border-y border-x-0',
                 isSelected
                   ? 'bg-[#F3F3F3] dark:bg-[#1E1F1E] text-foreground dark:text-[#F3F3F3] font-medium border-strong shadow-2xs'
                   : 'text-foreground-light hover:bg-surface-100 hover:text-foreground border-transparent',
@@ -164,7 +165,7 @@ export function TableExplorer({
               <div className="flex items-center gap-2 truncate">
                 <TableIcon
                   className={cn(
-                    'h-3.5 w-3.5 shrink-0 transition-colors',
+                    'h-3.5 w-3.5 shrink-0 transition-none',
                     isSelected
                       ? 'text-foreground dark:text-[#F3F3F3]'
                       : 'text-foreground-lighter group-hover:text-foreground'
@@ -173,16 +174,6 @@ export function TableExplorer({
                 <span className="truncate">{tbl.name}</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <span
-                  className={cn(
-                    'text-[10px] font-sans transition-colors',
-                    isSelected
-                      ? 'text-foreground-muted dark:text-[#F3F3F3]/70'
-                      : 'text-foreground-muted'
-                  )}
-                >
-                  {tbl.estimatedRowCount.toLocaleString()}
-                </span>
                 {onTableAction && (
                   <DropdownMenu
                     open={isMenuOpen}
@@ -194,10 +185,7 @@ export function TableExplorer({
                         onClick={(e) => e.stopPropagation()}
                         title={`Actions for "${tbl.name}"`}
                         aria-label={`Actions for ${tbl.name}`}
-                        className={cn(
-                          'items-center justify-center p-0.5 rounded text-foreground-lighter hover:text-foreground hover:bg-surface-200 transition-colors cursor-pointer',
-                          isSelected || isMenuOpen ? 'flex' : 'hidden'
-                        )}
+                        className="flex items-center justify-center p-0.5 rounded text-foreground-lighter hover:text-foreground hover:bg-surface-200 transition-none cursor-pointer"
                       >
                         <MoreVertical className="h-3.5 w-3.5" />
                       </button>
@@ -205,7 +193,8 @@ export function TableExplorer({
                     <DropdownMenuContent
                       align="start"
                       side="bottom"
-                      className="w-52"
+                      className="w-52 [&_*]:transition-none"
+                      style={{ animation: 'none', transition: 'none' }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <DropdownMenuItem onSelect={() => act('copy-name')}>
@@ -234,7 +223,7 @@ export function TableExplorer({
                           <Download className="shrink-0" />
                           <span>Export data</span>
                         </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-44">
+                        <DropdownMenuSubContent className="w-44 [&_*]:transition-none" style={{ animation: 'none', transition: 'none' }}>
                           <DropdownMenuItem onSelect={() => act('export-csv')}>
                             <span>Export as CSV</span>
                           </DropdownMenuItem>

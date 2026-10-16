@@ -15,7 +15,7 @@ export function parseSqlOutput(stdout: string) {
     else value += c
   }
   if (value || row.length || wasQuoted) { field(); records.push(row) }
-  const command = (r: (string | null)[]) => r.length === 1 && /^(CREATE |ALTER |DROP |INSERT \d|UPDATE \d|DELETE \d|BEGIN$|COMMIT$|ROLLBACK$|TRUNCATE |SET$|DO$|GRANT$|REVOKE$)/.test(r[0] ?? '')
+  const command = (r: (string | null)[]) => r.length === 1 && /^(CREATE |ALTER |DROP |INSERT \d|UPDATE \d|DELETE \d|BEGIN$|COMMIT$|ROLLBACK$|TRUNCATE |SET$|RESET$|DO$|GRANT$|REVOKE$|COMMENT$|SECURITY LABEL$|VACUUM$|ANALYZE$|REINDEX$|DISCARD ALL$)/.test(r[0] ?? '')
   const table = records.filter(r => !command(r))
   if (!table.length) return { columns: [] as string[], rows: [] as Record<string, unknown>[] }
   const columns = table[0].map(c => c ?? '')
@@ -23,4 +23,19 @@ export function parseSqlOutput(stdout: string) {
   // Keep every byte available in the separate raw-output panel.
   if (table.some(r => r.length !== columns.length)) return { columns: ['output'], rows: [{ output: stdout }] }
   return { columns, rows: table.slice(1).map(r => Object.fromEntries(columns.map((c, i) => [c, r[i]]))) }
+}
+
+export function parseSqlExecutionOutput(sql: string, stdout: string) {
+  const parsed = parseSqlOutput(stdout)
+  const multiple = sql.trim().replace(/;$/, '').includes(';')
+  // Schema dumps use SELECT set_config for session setup. Its empty value is
+  // not a table result; the subsequent CREATE/ALTER tags indicate successful DDL.
+  const schemaSetupOnly = multiple
+    && /^(CREATE |ALTER |DROP |COMMENT$)/m.test(stdout)
+    && parsed.columns.length === 1 && parsed.columns[0] === 'set_config'
+    && parsed.rows.every(row => row.set_config == null || row.set_config === '')
+  if (!parsed.columns.length || schemaSetupOnly) return { columns: [] as string[], rows: [] as Record<string, unknown>[] }
+  // Preserve the existing multi-result fallback; raw output remains available
+  // without turning command-only scripts into a one-cell results table.
+  return multiple ? { columns: ['output'], rows: [{ output: stdout }] } : parsed
 }

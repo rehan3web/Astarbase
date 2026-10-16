@@ -20,6 +20,7 @@ import { verifyDashboardMetrics } from './dashboard-metrics.browser'
 import { verifyStorageAndBackups } from './backups.browser'
 import { pipeline } from 'node:stream/promises'
 import { verifyVisualizerCopy } from './visualizer-copy.browser'
+import { verifySqlExecutionFeedback } from './sql-results.browser'
 
 async function main() {
 const run = promisify(execFile)
@@ -174,6 +175,41 @@ try {
     return
   }
 
+  if (process.env.STUDIO_EXPLORER_ONLY === '1') {
+    await page.goto(`${url}/tables`)
+    const explorer = page.locator('aside').filter({ has: page.getByPlaceholder('Search tables...') })
+    for (const name of ['items', 'comments']) {
+      const row = explorer.locator(`[data-table-explorer-row="${name}"]`)
+      await expect(row).toHaveText(name)
+      await expect(row.getByRole('button', { name: `Actions for ${name}`, exact: true })).toBeVisible()
+      assert.deepEqual(await row.evaluate(element => {
+        const style = getComputedStyle(element)
+        return { animation: style.animationName, transition: style.transitionDuration }
+      }), { animation: 'none', transition: '0s' })
+      await row.click()
+      await row.getByRole('button', { name: `Actions for ${name}`, exact: true }).click()
+      const menu = page.getByRole('menu')
+      await expect(menu).toBeVisible()
+      assert.deepEqual(await menu.evaluate(element => {
+        const style = getComputedStyle(element)
+        return { animation: style.animationName, transition: style.transitionDuration }
+      }), { animation: 'none', transition: '0s' })
+      await expect(page.getByRole('menuitem', { name: 'Edit table', exact: true })).toBeVisible()
+      await page.keyboard.press('Escape')
+    }
+    await snapshot('table-explorer')
+    assert.deepEqual(browserErrors, [])
+    console.log('PASS: Table Explorer hides row counts, keeps three-dot actions visible and opens menus without animation')
+    return
+  }
+
+  if (process.env.STUDIO_SQL_RESULTS_ONLY === '1') {
+    await verifySqlExecutionFeedback(page, url, config.DB_NAME, setQuery)
+    await snapshot('sql-success')
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
   await verifyVisualizerCopy(page, url, config.DB_NAME)
   await snapshot('visualizer-copy')
   if (process.env.STUDIO_VISUALIZER_ONLY === '1') {
@@ -198,6 +234,7 @@ try {
   await page.getByTitle('Run query (Ctrl+Enter)').click()
   await expectToast(/no_such_table.*does not exist/, true)
   console.log('PASS: SQL results and actual SQL error rendering')
+  await verifySqlExecutionFeedback(page, url, config.DB_NAME, setQuery)
   await verifyDashboardMetrics(page, url, config, services)
   await snapshot('dashboard-metrics')
   if (process.env.STUDIO_CONNECT_ONLY === '1') {
