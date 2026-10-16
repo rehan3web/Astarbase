@@ -17,7 +17,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const { notify } = useNotifications()
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [configured, setConfigured] = useState(true)
-  const [token, setToken] = useState('')
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
@@ -45,10 +46,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   async function login(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError('')
     try {
-      const res = await fetch('/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+      const res = await fetch('/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier, password }) })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error)
-      setToken(''); setAuthenticated(true)
+      setPassword(''); setAuthenticated(true)
       notify('Signed in successfully')
     } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
   }
@@ -58,9 +59,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     <div className="h-screen grid place-items-center bg-studio p-6">
       <form onSubmit={login} className="w-full max-w-md rounded-lg border border-default p-8 space-y-5 bg-dash-sidebar">
         <h1 className="text-xl font-semibold">Astarbase Admin Studio</h1>
-        <p className="text-sm text-foreground-lighter">Sign in with your admin token. It is exchanged for an HttpOnly session and is never stored in browser storage.</p>
-        {!configured && <p role="alert" className="text-amber-500 text-sm">Studio is not configured. Set ADMIN_API_TOKEN on the frontend server to match the backend.</p>}
-        <label className="block text-sm">Admin token<input type="password" required autoComplete="current-password" value={token} onChange={e => setToken(e.target.value)} className="mt-2 w-full rounded border border-default bg-studio p-2" /></label>
+        <p className="text-sm text-foreground-lighter">Sign in with your admin username or email and password.</p>
+        {!configured && <p role="alert" className="text-amber-500 text-sm">Admin login needs server-side setup.</p>}
+        <label className="block text-sm">Username or email<input type="text" autoComplete="username" placeholder="Enter your username or email" required maxLength={254} value={identifier} onChange={e => setIdentifier(e.target.value)} className="mt-2 w-full rounded border border-default bg-studio p-2" /></label>
+        <label className="block text-sm">Password<input type="password" autoComplete="current-password" required maxLength={256} value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded border border-default bg-studio p-2" /></label>
         {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
         <button disabled={busy || !configured} className="w-full rounded bg-brand-500 text-black p-2 disabled:opacity-50">{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>

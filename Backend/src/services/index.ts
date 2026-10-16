@@ -6,6 +6,7 @@ import { BranchService } from './branches/branches.service.js';
 import { BackupService } from './backups/backups.service.js';
 import { TableService } from './tables/tables.service.js';
 import { SchemaService } from './visualizer/visualizer.service.js';
+import { AuthService } from './auth/auth.service.js';
 
 export function createServices(config: Config) {
   const catalog = new Catalog(config);
@@ -13,7 +14,7 @@ export function createServices(config: Config) {
   const branches = new BranchService(catalog, postgres);
   const tables = new TableService(config);
   return {
-    catalog, postgres, branches, tables,
+    catalog, postgres, branches, tables, auth: new AuthService(config, catalog.store),
     backups: new BackupService(catalog, postgres, branches),
     schema: new SchemaService(tables),
     async health() {

@@ -14,6 +14,7 @@ async function main() {
   }
   const services = await startupStep('admin-store', () => createServices(config));
   try {
+    await startupStep('admin-login', () => services.auth.initialize());
     await startupStep('docker', () => services.postgres.docker.ready());
     await startupStep('database', () => pushDatabase(config, services.catalog.store));
     const listeners = await startupStep('listeners', () => startAdminListeners(createApp(config, services), config.PORT));

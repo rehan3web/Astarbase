@@ -6,9 +6,11 @@ import { branchesRoutes } from './branches/branches.routes.js';
 import { visualizerRoutes } from './visualizer/visualizer.routes.js';
 import { backupsRoutes } from './backups/backups.routes.js';
 import { settingsRoutes } from './settings/settings.routes.js';
+import { authRoutes } from './auth/auth.routes.js';
 
 export function apiRoutes(services: Services) {
   const router = Router();
+  router.use('/auth', authRoutes(services));
   router.use('/sql', sqlRoutes(services));
   router.use('/databases', databaseRoutes(services));
   router.use('/databases/:database/tables', tablesRoutes(services));

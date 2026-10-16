@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createHmac } from 'node:crypto'
 import { parseSqlOutput } from '../lib/sql-results'
 import { issueSession, verifySession } from '../lib/server/session'
 import { qi, literal } from '../lib/api'
@@ -20,6 +21,9 @@ test('sessions are signed, reject tampering and invalid secrets', () => {
   assert.equal(verifySession(session, secret + 'x'), false)
   assert.equal(verifySession(session, ''), false)
   assert.equal(verifySession(undefined, secret), false)
+  const oldPayload = Buffer.from(JSON.stringify({ expires: Date.now() + 60000, nonce: 'legacy-token-session' })).toString('base64url')
+  const oldSignature = createHmac('sha256', secret).update(`studio-session:${oldPayload}`).digest('base64url')
+  assert.equal(verifySession(`${oldPayload}.${oldSignature}`, secret), false)
 })
 test('live table mapping preserves composite keys; create SQL quotes names', () => {
   const node = {

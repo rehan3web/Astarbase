@@ -17,7 +17,8 @@ export function errorHandler(config: Config): ErrorRequestHandler {
       (error as { type?: string })?.type === 'entity.parse.failed' ? 400 :
       (error as { type?: string })?.type === 'entity.too.large' ? 413 : 500;
     const raw = error instanceof Error ? error.message : 'Operation failed';
-    const message = raw.replaceAll(config.DB_PASSWORD, '[redacted]').replaceAll(config.ADMIN_API_TOKEN, '[redacted]');
+    let message = raw.replaceAll(config.DB_PASSWORD, '[redacted]').replaceAll(config.ADMIN_API_TOKEN, '[redacted]');
+    if (config.ADMIN_PASSWORD) message = message.replaceAll(config.ADMIN_PASSWORD, '[redacted]');
     res.status(status).json({ error: message });
   };
 }

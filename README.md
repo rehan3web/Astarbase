@@ -14,7 +14,8 @@ and separate frontend/backend startup commands are not required.**
 
 ```sh
 cp .env.example .env
-# Fill DB_NAME, DB_USER, DB_PASSWORD and ADMIN_API_TOKEN locally.
+# Fill DB_NAME, DB_USER, DB_PASSWORD, ADMIN_API_TOKEN,
+# ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD and SESSION_SECRET locally.
 # DB_PASSWORD: at least 16 characters. ADMIN_API_TOKEN: at least 32 characters.
 docker compose up --build -d --wait
 ```
@@ -37,7 +38,21 @@ commands. Do not use `down -v` unless you intend to delete database volumes.
 
 1. Open **http://YOUR_VPS_IP:5000** remotely, or **http://127.0.0.1:5000**
    on the Docker host (use your configured `STUDIO_PORT` if different).
-2. Sign in with the admin token you set in `.env` (or your legacy `Backend/.env`).
+2. Sign in with your **admin username or email and password**. On first startup,
+   `ADMIN_USERNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` (or legacy
+   `Backend/.env`) create the admin account. Use a 3–48-character username,
+   a valid email and a 12–256-character password. There is no default password
+   or public registration. Only a salted scrypt password hash is saved in
+   `Backend/data/admin.sqlite`; the browser receives an HttpOnly session cookie.
+   Existing accounts are never overwritten on restart, so changing these
+   bootstrap variables later does not reset the account. After initial setup
+   you may remove `ADMIN_PASSWORD` from `.env`.
+   Set a **new `SESSION_SECRET` of at least 32 characters**, different from the
+   old login token, for private cookie signing. Never reuse `ADMIN_API_TOKEN`
+   as `SESSION_SECRET`: old token holders must not be able to forge sessions.
+   `ADMIN_API_TOKEN` remains a private server-to-server secret;
+   it is not accepted as a Studio login. Existing token-login sessions must
+   sign in again after this update.
 3. Open SQL and run the following on `main`:
 
    ```sql

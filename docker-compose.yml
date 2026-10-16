@@ -65,6 +65,9 @@ services:
       LEGACY_CONTROL_DB: ${LEGACY_CONTROL_DB:-${CONTROL_DB:-astarbase_control}}
       ADMIN_DATA_DIR: /app/Backend/data
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       AUTO_START_COMPOSE: "false"
       PORT: "8000"
       DOCKER_SOCKET: /var/run/docker.sock
@@ -98,6 +101,7 @@ services:
       dockerfile: Frontend/dockerfile
     environment:
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN}
+      SESSION_SECRET: ${SESSION_SECRET:?Set a new SESSION_SECRET of at least 32 characters}
       ADMIN_SOCKET_PATH: /var/run/astarbase/admin.sock
       STUDIO_COOKIE_SECURE: ${STUDIO_COOKIE_SECURE:-false}
     volumes:

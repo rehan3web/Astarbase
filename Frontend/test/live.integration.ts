@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { spawn, execFile, type ChildProcess } from 'node:child_process'
 import { promisify } from 'node:util'
-import { randomBytes } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import { chromium, expect, type Browser } from '@playwright/test'
 import { loadConfig, type Config } from '../../Backend/src/config'
 import { createApp, createServices, type Services } from '../../Backend/src/index'
@@ -23,10 +23,13 @@ const backups = path.join(dir, 'backups')
 const socketPath = path.join(dir, 'admin.sock')
 const data = path.join(dir, 'pgdata')
 const token = randomBytes(32).toString('hex')
+const signingSecret = randomBytes(32).toString('hex')
+const loginPassword = randomBytes(24).toString('hex')
 const config = {
   ...loadConfig({
     DB_NAME: 'ui_project', DB_USER: 'ui_admin', DB_PASSWORD: randomBytes(24).toString('hex'),
     ADMIN_API_TOKEN: token, ADMIN_DATA_DIR: path.join(dir, 'admin'), AUTO_START_COMPOSE: 'false',
+    ADMIN_USERNAME: 'studio_owner', ADMIN_EMAIL: 'owner@example.test', ADMIN_PASSWORD: loginPassword,
   }),
   PG_SOCKET_DIR: pgSocket, BACKUP_DIR: backups,
 } as Config
@@ -44,6 +47,7 @@ try {
   pgStarted = true
   await withDatabase(config, 'postgres', client => client.query(`CREATE DATABASE ${quoteIdentifier(config.DB_NAME)}`))
   services = createServices(config)
+  await services.auth.initialize()
   services.postgres.docker.exec = async command => {
     const [exe, ...args] = command
     assert.ok(['psql', 'pg_dump', 'pg_restore', 'stat', 'rm', 'find'].includes(exe))
@@ -59,7 +63,7 @@ try {
   listeners = await startAdminListeners(createApp(config, services), 0, socketPath)
   next = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '5100'], {
     cwd: process.cwd(),
-    env: { ...process.env, ADMIN_API_TOKEN: token, ADMIN_SOCKET_PATH: socketPath, STUDIO_COOKIE_SECURE: 'false' },
+    env: { ...process.env, ADMIN_API_TOKEN: token, SESSION_SECRET: signingSecret, ADMIN_SOCKET_PATH: socketPath, STUDIO_COOKIE_SECURE: 'false' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   next.stdout?.on('data', chunk => { logs += chunk.toString() })
@@ -102,14 +106,50 @@ try {
   const browserErrors: string[] = []
   page.on('pageerror', error => browserErrors.push(error.message))
   await page.goto(url)
-  await page.getByLabel('Admin token', { exact: true }).fill(token)
+  await expect(page.getByLabel('Admin token', { exact: true })).toHaveCount(0)
+  await snapshot('password-login')
+  const tokenAttempt = await page.request.post(`${url}/api/session`, {
+    headers: { Origin: url }, data: { token },
+  })
+  assert.equal(tokenAttempt.status(), 400)
+  assert.equal((await page.request.get(`${url}/api/studio/branches`)).status(), 401)
+  await page.getByLabel('Username or email', { exact: true }).fill('studio_owner')
+  await page.getByLabel('Password', { exact: true }).fill('incorrect-password')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expectToast('Invalid username/email or password', true)
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await page.getByLabel('Password', { exact: true }).fill(loginPassword)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Active branch', exact: true })).toBeVisible()
   await snapshot('home')
   const cookie = (await page.context().cookies()).find(c => c.name === 'astarbase_session')
   assert.ok(cookie?.httpOnly)
   assert.equal(cookie?.value.includes(token), false)
-  console.log('PASS: real sign-in, HttpOnly session, and unauthenticated proxy rejection')
+  assert.equal(cookie?.value.includes(loginPassword), false)
+  assert.equal(cookie?.sameSite, 'Strict')
+  const payload = cookie!.value.split('.')[0]
+  const forged = `${payload}.${createHmac('sha256', token).update(`studio-session:${payload}`).digest('base64url')}`
+  await page.context().addCookies([{ ...cookie!, value: forged }])
+  assert.equal((await page.request.get(`${url}/api/studio/branches`)).status(), 401)
+  await page.context().addCookies([cookie!])
+  assert.equal((await page.request.get(`${url}/api/studio/branches`)).status(), 200)
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await page.getByLabel('Username or email', { exact: true }).fill('OWNER@EXAMPLE.TEST')
+  await page.getByLabel('Password', { exact: true }).fill(loginPassword)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Active branch', exact: true })).toBeVisible()
+  console.log('PASS: username and email password login, failed password, rejected token login, HttpOnly sessions, logout and unauthenticated proxy rejection')
+  assert.equal((await page.request.get(`${url}/api/studio/branches`)).status(), 200)
+  assert.equal((await page.request.get(`${url}/api/studio/auth/status`)).status(), 404)
+  const csrf = await page.request.post(`${url}/api/session`, {
+    headers: { Origin: 'https://untrusted.invalid' }, data: { identifier: 'studio_owner', password: loginPassword },
+  })
+  assert.equal(csrf.status(), 403)
+  if (process.env.STUDIO_AUTH_ONLY === '1') {
+    assert.deepEqual(browserErrors, [])
+    return
+  }
 
   await page.goto(`${url}/sql`)
   await setQuery('SELECT 42 AS answer;')

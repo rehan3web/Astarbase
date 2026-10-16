@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { request as socketRequest } from 'node:http'
 import { Readable } from 'node:stream'
-import { adminToken, COOKIE, validOrigin, verifySession } from '@/lib/server/session'
+import { adminToken, sessionSecret, COOKIE, validOrigin, verifySession } from '@/lib/server/session'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 async function proxy(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const token = adminToken()
-  if (!verifySession(req.cookies.get(COOKIE)?.value, token)) return NextResponse.json({ error: 'Sign in to Studio first' }, { status: 401 })
+  if (!verifySession(req.cookies.get(COOKIE)?.value, sessionSecret())) return NextResponse.json({ error: 'Sign in to Studio first' }, { status: 401 })
   if (!['GET', 'HEAD'].includes(req.method) && !validOrigin(req)) return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
   const { path } = await context.params
   if (!path.length || path.some(p => p === '..' || p.includes('/') || p.includes('\\')) ||

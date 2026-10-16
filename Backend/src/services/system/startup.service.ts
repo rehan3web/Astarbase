@@ -1,8 +1,9 @@
-export type StartupStage = 'configuration' | 'compose' | 'admin-store' | 'docker' | 'database' | 'listeners';
+export type StartupStage = 'configuration' | 'compose' | 'admin-store' | 'admin-login' | 'docker' | 'database' | 'listeners';
 const descriptions: Record<StartupStage, string> = {
   configuration: 'validating configuration',
   compose: 'starting Docker Compose',
   'admin-store': 'opening admin SQLite metadata',
+  'admin-login': 'initializing admin password login',
   docker: 'checking Docker Unix socket and Postgres container',
   database: 'checking Postgres Unix socket and initializing metadata',
   listeners: 'opening Admin Unix socket and health listener',

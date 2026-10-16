@@ -22,7 +22,8 @@ export const settingsSchema = z.object({
 export type AdminSettings = z.infer<typeof settingsSchema>;
 const defaults: AdminSettings = { projectName: 'Astarbase', defaultRowLimit: 100, theme: 'system' };
 
-// SQLite contains admin settings and inventory only. Application rows and
+// SQLite contains admin settings, inventory and salted authentication hashes.
+// Plaintext login passwords are never stored. Application rows and
 // schemas stay in Postgres; pg_dump archives stay in Backend/backups.
 export class AdminStore {
   readonly file: string;
@@ -51,6 +52,13 @@ export class AdminStore {
       CREATE INDEX IF NOT EXISTS backups_database_idx ON backups(database_name);
       CREATE TABLE IF NOT EXISTS admin_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS admin_migrations (name TEXT PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS admin_accounts (
+        id INTEGER PRIMARY KEY CHECK(id = 1),
+        username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
     `);
     // Add metadata in-place for existing installations. Check under the write
     // lock so concurrent Studio starts cannot both attempt the same ALTER.
@@ -74,6 +82,14 @@ export class AdminStore {
   }
 
   close() { this.db.close(); }
+  adminAccount(): { username: string; email: string; password_hash: string } | undefined {
+    return this.db.prepare('SELECT username,email,password_hash FROM admin_accounts WHERE id = 1').get() as
+      { username: string; email: string; password_hash: string } | undefined;
+  }
+  createAdminAccount(username: string, email: string, passwordHash: string) {
+    this.db.prepare('INSERT OR IGNORE INTO admin_accounts(id,username,email,password_hash,created_at) VALUES(1,?,?,?,?)')
+      .run(username, email, passwordHash, new Date().toISOString());
+  }
   health() { this.db.prepare('SELECT 1').get(); }
   branches(): Branch[] {
     return this.db.prepare('SELECT * FROM branches ORDER BY created_at,name').all().map(row => ({ ...row }) as Branch);

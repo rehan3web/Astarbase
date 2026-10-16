@@ -15,6 +15,9 @@ test('Compose alone loads root .env and wires all four services in dependency or
     writeFileSync(path.join(dir, '.env'), [
       'DB_NAME=compose_project', 'DB_USER=compose_admin',
       'DB_PASSWORD=compose-test-password-0000', `ADMIN_API_TOKEN=${token}`,
+      'SESSION_SECRET=compose-private-cookie-secret-not-for-deployment-0000',
+      'ADMIN_USERNAME=compose_owner', 'ADMIN_EMAIL=owner@example.test',
+      'ADMIN_PASSWORD=compose-login-password-not-for-deployment',
     ].join('\n'));
     const output = execFileSync('docker', ['--host', 'unix:///var/run/docker.sock', 'compose',
       '--project-directory', dir, '-f', path.join(projectDir, 'docker-compose.yml'), 'config', '--format', 'json'], {
@@ -25,6 +28,9 @@ test('Compose alone loads root .env and wires all four services in dependency or
     assert.equal(services.postgres.environment.POSTGRES_DB, 'compose_project');
     assert.equal(services.studio.environment.AUTO_START_COMPOSE, 'false');
     assert.equal(services.frontend.environment.ADMIN_API_TOKEN, token);
+    assert.notEqual(services.frontend.environment.SESSION_SECRET, token);
+    assert.equal(services.studio.environment.ADMIN_USERNAME, 'compose_owner');
+    assert.equal(services.frontend.environment.ADMIN_PASSWORD, undefined);
     assert.equal(services.studio.environment.DB_USER, 'compose_admin');
     assert.equal(services.frontend.depends_on.studio.condition, 'service_healthy');
     assert.equal(services.studio.depends_on.postgres.condition, 'service_healthy');
