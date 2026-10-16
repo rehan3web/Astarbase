@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Services } from '../../services/index.js';
 import { dbName } from '../validation.js';
+import { clientPassword } from '../../services/connection/password.js';
 
 export function connectionController(services: Services) {
   const headers = (res: Response) => {
@@ -22,12 +23,12 @@ export function connectionController(services: Services) {
     },
     async reset(req: Request, res: Response) {
       const database = dbName.parse(req.params.database);
-      const body = z.object({ confirmDatabase: dbName }).strict().parse(req.body);
+      const body = z.object({ confirmDatabase: dbName, password: clientPassword }).strict().parse(req.body);
       if (body.confirmDatabase !== database) {
         res.status(400).json({ error: 'Confirm the exact database name' }); return;
       }
       headers(res);
-      res.json(await services.clientRoles.reset(database));
+      res.json(await services.clientRoles.reset(database, body.password));
     },
     async pool(req: Request, res: Response) {
       headers(res);

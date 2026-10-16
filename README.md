@@ -91,9 +91,12 @@ to another managed database. Branch refresh/backup restore strips source ACLs
 and reapplies the destination client's access; its password stays unchanged.
 Existing roles with conflicting names are rejected, never adopted or reset.
 
-In Settings, **Reset database password** rotates only the selected database's
-client password after confirming its exact database name. Get the replacement
-password using **Connect → Show password** and update external clients.
+In Settings, **Reset database password** opens a password-entry dialog for the
+selected main, branch or child database only. Enter your own 16–256-character
+password, or use **Generate a password** to fill an optional secure random value;
+you can edit it before saving. Random initial passwords are still assigned
+automatically when branches are created. Get the saved password using
+**Connect → Show password** and update external clients.
 Already-authenticated sessions can remain connected. PgBouncer uses a restricted
 Postgres SCRAM authentication query, so new branch users and password changes
 do not require editing a user list or restarting the pooler.

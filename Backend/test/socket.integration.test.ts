@@ -215,14 +215,22 @@ test('real Postgres over Unix socket: DB push, CRUD, ERD, branching, refresh and
       assert.equal((await connect(config.DB_NAME, main)).rows[0].current_user, 'astarbase_main');
       await assert.rejects(connect(config.DB_NAME, dev), /permission denied/);
       await assert.rejects(connect('branch_nested', dev), /permission denied/);
-      await roles.reset('branch_dev');
+      const chosenPassword = `chosen-'quote-\\slash-$"password`;
+      await roles.reset('branch_dev', chosenPassword);
       await assert.rejects(connect('branch_dev', dev), /password authentication failed/);
       const next = await roles.get('branch_dev');
+      assert.equal(next.password, chosenPassword);
       assert.equal((await connect('branch_dev', next)).rows[0].current_user, 'dev');
       assert.deepEqual(await roles.get(config.DB_NAME), main);
       assert.deepEqual(await roles.get('branch_nested'), nested);
       await roles.initialize();
       assert.deepEqual(await roles.get('branch_dev'), next);
+      const mainPassword = 'chosen-main-database-password';
+      await roles.reset(config.DB_NAME, mainPassword);
+      await assert.rejects(connect(config.DB_NAME, main), /password authentication failed/);
+      assert.equal((await connect(config.DB_NAME, { ...main, password: mainPassword })).rows[0].current_user, 'astarbase_main');
+      assert.deepEqual(await roles.get('branch_dev'), next);
+      assert.deepEqual(await roles.get('branch_nested'), nested);
       const lookup = await withDatabase(config, 'postgres', client =>
         client.query('SELECT * FROM astarbase_pool_auth.lookup($1)', ['dev']));
       assert.match(lookup.rows[0].passwd, /^SCRAM-SHA-256\$/);

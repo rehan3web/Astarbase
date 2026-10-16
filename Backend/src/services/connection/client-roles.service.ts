@@ -4,6 +4,7 @@ import { quoteIdentifier as qi, withDatabase } from '../../db/socket.js';
 import { HttpError } from '../../errors.js';
 import type { Catalog } from '../admin/catalog.service.js';
 import { CredentialStore } from './credential-store.js';
+import { clientPassword } from './password.js';
 
 const group = 'astarbase_client_roles';
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
@@ -87,10 +88,14 @@ export class ClientRolesService {
     if (!credential) throw new HttpError(503, 'Database client credentials are not initialized; restart Studio after upgrading');
     return credential;
   }
-  async reset(database: string) {
+  async reset(database: string, password: string) {
+    if (!clientPassword.safeParse(password).success) {
+      throw new HttpError(400, 'Use a password of 16–256 characters without control characters');
+    }
+    await this.catalog.assertDatabase(database);
     return this.catalog.exclusive(async () => {
       const previous = await this.get(database);
-      const next = { user: previous.user, password: randomBytes(32).toString('base64url') };
+      const next = { user: previous.user, password };
       await this.credentials.set(database, next);
       try {
         await this.run(this.config, 'postgres', client =>

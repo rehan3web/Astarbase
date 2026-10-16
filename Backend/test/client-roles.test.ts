@@ -71,7 +71,9 @@ test('main, branch and child get separate roles; resets and reprovision preserve
   assert.ok(queries.some(sql => sql.includes('SECURITY DEFINER SET search_path = pg_catalog')));
   assert.ok(queries.some(sql => sql.includes('AND NOT rolsuper')));
   assert.ok(queries.some(sql => sql.includes('REVOKE ALL ON FUNCTION')));
-  await roles.reset('branch_dev');
+  const chosenPassword = `chosen-password-'quote-\\slash-$"`;
+  await roles.reset('branch_dev', chosenPassword);
+  assert.equal((await roles.get('branch_dev')).password, chosenPassword);
   assert.notEqual((await roles.get('branch_dev')).password, dev.password);
   assert.deepEqual(await roles.get(config.DB_NAME), main);
   assert.deepEqual(await roles.get('branch_child'), child);
@@ -79,9 +81,12 @@ test('main, branch and child get separate roles; resets and reprovision preserve
   await roles.provision('branch_dev', 'dev');
   assert.deepEqual(await roles.get('branch_dev'), rotated);
   rejectPassword = true;
-  await assert.rejects(roles.reset('branch_dev'), /Could not rotate/);
+  await assert.rejects(roles.reset('branch_dev', 'replacement-client-password'), /Could not rotate/);
   assert.deepEqual(await roles.get('branch_dev'), rotated);
-  await assert.rejects(roles.reset('unmanaged'), /Managed database not found/);
+  await assert.rejects(roles.reset('unmanaged', chosenPassword), /Managed database not found/);
+  for (const password of ['', 'short', 'x'.repeat(257), 'invalid-control-password\n']) {
+    await assert.rejects(roles.reset('branch_dev', password), /16–256/);
+  }
   existing.set('collision', { managed: false, rolsuper: true });
   await assert.rejects(roles.provision('branch_collision', 'collision'), /already in use/);
   assert.equal(await roles.credentials.get('branch_collision'), null);

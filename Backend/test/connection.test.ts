@@ -41,13 +41,30 @@ test('connection metadata and explicit password reveal require admin auth and ma
   await request(app).post(url + '/reset').send({ confirmDatabase: config.DB_NAME }).expect(401);
   await request(app).post(url + '/reset').set(auth).send({ confirmDatabase: 'wrong' }).expect(400);
   await request(app).post(url + '/reset').set(auth).send({ confirmDatabase: config.DB_NAME, password: 'custom' }).expect(400);
+  const chosenPassword = 'chosen-client-password-fixture';
+  await request(app).post(url + '/reset').set(auth).send({ confirmDatabase: 'wrong', password: chosenPassword }).expect(400);
+  for (const password of [undefined, '', 'short', 'x'.repeat(257), 'invalid-control-password\n']) {
+    const rejected = await request(app).post(url + '/reset').set(auth)
+      .send({ confirmDatabase: config.DB_NAME, password }).expect(400);
+    if (password && password.length >= 16) assert.equal(JSON.stringify(rejected.body).includes(password), false);
+  }
+  await request(app).post('/api/databases/unmanaged/connection/reset').set(auth)
+    .send({ confirmDatabase: 'unmanaged', password: chosenPassword }).expect(404);
   let rotatedDatabase = '';
-  services.clientRoles.reset = async database => { rotatedDatabase = database; return { user: 'dev', rotated: true }; };
+  let receivedPassword = '';
+  services.clientRoles.reset = async (database, password) => {
+    rotatedDatabase = database; receivedPassword = password; return { user: 'dev', rotated: true };
+  };
   const rotated = await request(app).post('/api/databases/branch_dev/connection/reset').set(auth)
-    .send({ confirmDatabase: 'branch_dev' }).expect(200);
+    .send({ confirmDatabase: 'branch_dev', password: chosenPassword }).expect(200);
   assert.equal(rotatedDatabase, 'branch_dev');
+  assert.equal(receivedPassword, chosenPassword);
+  assert.equal(JSON.stringify(rotated.body).includes(chosenPassword), false);
   assert.equal(rotated.body.rotated, true);
   assert.match(rotated.headers['cache-control'], /no-store/);
+  await request(app).post(url + '/reset').set(auth)
+    .send({ confirmDatabase: config.DB_NAME, password: chosenPassword }).expect(200);
+  assert.equal(rotatedDatabase, config.DB_NAME);
   await request(app).get('/api/databases/branch_dev/connection/pool').set(auth).expect(403);
   await request(app).patch(url + '/pool').set(auth).send({ poolSize: 20, maxClientConnections: 300 }).expect(400);
   for (const poolSize of [0, 81, 1.5, '20']) {

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -23,10 +24,22 @@ function DatabaseSettings({ database, main }: { database: string; main: boolean 
   const [poolError, setPoolError] = useState('')
   const [saving, setSaving] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
-  const [confirmation, setConfirmation] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [resetError, setResetError] = useState('')
   const [resetting, setResetting] = useState(false)
   const path = `/databases/${encodeURIComponent(database)}/connection`
+  const validPassword = newPassword.length >= 16 && newPassword.length <= 256 && !/[\x00-\x1f\x7f]/.test(newPassword)
+
+  function generatePassword() {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
+    const bytes = window.crypto.getRandomValues(new Uint8Array(32))
+    setNewPassword(Array.from(bytes, byte => alphabet[byte & 63]).join(''))
+    setResetError('')
+  }
+
+  function closeReset() {
+    setResetOpen(false); setNewPassword(''); setResetError('')
+  }
 
   useEffect(() => {
     if (!main) return
@@ -50,11 +63,11 @@ function DatabaseSettings({ database, main }: { database: string; main: boolean 
 
   async function resetPassword(event: React.FormEvent) {
     event.preventDefault()
-    if (confirmation !== database) return
+    if (!validPassword) return
     setResetting(true); setResetError('')
     try {
-      await api(`${path}/reset`, { method: 'POST', body: { confirmDatabase: confirmation } })
-      setResetOpen(false); setConfirmation('')
+      await api(`${path}/reset`, { method: 'POST', body: { confirmDatabase: database, password: newPassword } })
+      closeReset()
       // Any open connection view must discard its previously revealed password.
       window.dispatchEvent(new CustomEvent('studio-credentials-changed', { detail: database }))
       notify('Database password reset. Use Connect to reveal the new password.')
@@ -73,8 +86,8 @@ function DatabaseSettings({ database, main }: { database: string; main: boolean 
           <div className="mb-4"><h2 className="text-xl font-medium text-foreground mb-1">Database password</h2><p className="text-sm text-foreground-lighter">Used for direct Postgres and pooled connections to this database</p></div>
           <div className="border border-default bg-studio rounded-xl overflow-hidden">
             <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-              <div><h3 className="text-sm font-medium text-foreground mb-1">Reset database password</h3><p className="text-sm text-foreground-lighter">Generate a random password for <code>{database}</code> only. Other branches and the internal admin connection are not changed. View the new password in Connect.</p></div>
-              <Button variant="default" onClick={() => { setResetError(''); setConfirmation(''); setResetOpen(true) }}>Reset database password</Button>
+              <div><h3 className="text-sm font-medium text-foreground mb-1">Reset database password</h3><p className="text-sm text-foreground-lighter">Choose a new password for <code>{database}</code> only. Other branches and the internal admin connection are not changed. View the current password in Connect.</p></div>
+              <Button variant="default" onClick={() => { setResetError(''); setNewPassword(''); setResetOpen(true) }}>Reset database password</Button>
             </div>
           </div>
         </section>
@@ -109,15 +122,35 @@ function DatabaseSettings({ database, main }: { database: string; main: boolean 
           </div>
         </section>
       </div>
-      <Dialog open={resetOpen} onOpenChange={open => { if (!resetting) setResetOpen(open) }}>
-        <DialogContent>
-          <form onSubmit={resetPassword} className="space-y-5">
-            <DialogHeader><DialogTitle>Reset database password</DialogTitle><DialogDescription>New direct and pooled connections will need the new password. Existing sessions may remain connected. No data is deleted, and no other database password changes.</DialogDescription></DialogHeader>
-            <label className="block text-sm text-foreground">Type <code>{database}</code> to confirm
-              <Input aria-label="Confirm database name" autoComplete="off" value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={resetting} className="mt-2" />
-            </label>
-            {resetError && <p role="alert" className="text-sm text-red-400">{resetError}</p>}
-            <DialogFooter><Button type="button" variant="default" disabled={resetting} onClick={() => setResetOpen(false)}>Cancel</Button><Button type="submit" variant="primary" disabled={resetting || confirmation !== database}>{resetting ? 'Resetting…' : 'Reset password'}</Button></DialogFooter>
+      <Dialog open={resetOpen} onOpenChange={open => { if (!resetting) { if (open) setResetOpen(true); else closeReset() } }}>
+        <DialogContent className="max-w-xl">
+          <form onSubmit={resetPassword}>
+            <DialogHeader>
+              <DialogTitle>Reset database password</DialogTitle>
+              <DialogDescription>Set a new password for <code>{database}</code>. Other databases are not affected.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-6">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex gap-3">
+                <div className="shrink-0 mt-0.5">
+                  <div className="h-5 w-5 bg-amber-500 rounded flex items-center justify-center">
+                    <AlertTriangle className="h-3.5 w-3.5 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-foreground mb-1">This password is shared across every connection method</h4>
+                  <p className="text-sm text-foreground-lighter leading-relaxed">For this database, new direct and pooler connections from any app, ORM, or tool will need the new password. Update it everywhere you use this database. Existing sessions may remain connected.</p>
+                </div>
+              </div>
+              <div>
+                <Input aria-label="New database password" type="password" autoComplete="new-password" placeholder="Type in a strong password" value={newPassword} minLength={16} maxLength={256} required disabled={resetting} onChange={event => { setNewPassword(event.target.value); setResetError('') }} className="mb-2" />
+                <p className="text-sm text-foreground-lighter">This is the password to your Postgres database, so it must be strong and hard to guess. Use 16–256 characters. <button type="button" className="underline disabled:opacity-50" disabled={resetting} onClick={generatePassword}>Generate a password</button>.</p>
+              </div>
+              {resetError && <p role="alert" className="text-sm text-red-400">{resetError}</p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="default" disabled={resetting} onClick={closeReset}>Cancel</Button>
+              <Button type="submit" variant="primary" loading={resetting} disabled={resetting || !validPassword}>Reset password</Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

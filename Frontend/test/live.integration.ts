@@ -202,6 +202,22 @@ try {
     await page.reload()
     await expect(poolInput).toHaveValue('35')
     await snapshot('main-database-settings')
+    await page.getByRole('button', { name: 'Reset database password', exact: true }).click()
+    const passwordInput = page.getByLabel('New database password', { exact: true })
+    const resetButton = page.getByRole('button', { name: 'Reset password', exact: true })
+    await expect(passwordInput).toHaveValue('')
+    await expect(passwordInput).toHaveAttribute('type', 'password')
+    await expect(resetButton).toBeDisabled()
+    await passwordInput.fill('short')
+    await expect(resetButton).toBeDisabled()
+    await page.getByRole('button', { name: 'Generate a password', exact: true }).click()
+    await expect(passwordInput).toHaveValue(/^[A-Za-z0-9_-]{32}$/)
+    const manualMainPassword = 'chosen-main-client-password'
+    await passwordInput.fill(manualMainPassword)
+    await snapshot('reset-password-modal')
+    await resetButton.click()
+    await expectToast('Database password reset. Use Connect to reveal the new password.')
+    assert.equal((await services.clientRoles.get(config.DB_NAME)).password, manualMainPassword)
     const mainCredential = await services.clientRoles.get(config.DB_NAME)
     for (const [name, parent] of [['settings_dev', 'main'], ['settings_child', 'settings_dev']]) {
       await services.branches.create(name, parent)
@@ -215,22 +231,33 @@ try {
       assert.equal(before.user, name)
       await page.getByRole('button', { name: 'Reset database password', exact: true }).click()
       await expect(page.getByRole('button', { name: 'Reset password', exact: true })).toBeDisabled()
-      await page.getByLabel('Confirm database name', { exact: true }).fill(database)
+      await expect(passwordInput).toHaveValue('')
+      await page.getByRole('button', { name: 'Generate a password', exact: true }).click()
+      const generated = await passwordInput.inputValue()
+      assert.match(generated, /^[A-Za-z0-9_-]{32}$/)
+      const desired = parent === 'main' ? 'chosen-branch-client-password' : generated
+      await passwordInput.fill(desired)
       await page.getByRole('button', { name: 'Reset password', exact: true }).click()
       await expectToast('Database password reset. Use Connect to reveal the new password.')
       const after = await services.clientRoles.get(database)
       assert.notEqual(after.password, before.password)
+      assert.equal(after.password, desired)
       assert.deepEqual(await services.clientRoles.get(config.DB_NAME), mainCredential)
       await snapshot(`${name}-settings`)
       const response = await page.request.post(`${url}/api/studio/databases/${database}/connection/reveal`, {
         headers: { Origin: url }, data: {},
       })
       assert.equal((await response.json()).password, after.password)
+      await page.getByRole('button', { name: 'Reset database password', exact: true }).click()
+      await expect(passwordInput).toHaveValue('')
+      await passwordInput.fill('cancelled-password-change')
+      await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+      assert.deepEqual(await services.clientRoles.get(database), after)
     }
     await page.setViewportSize({ width: 390, height: 844 })
     await snapshot('mobile-database-settings')
     assert.deepEqual(browserErrors, [])
-    console.log('PASS: main-only editable pool size, fixed 200 clients, removed preferences, independent branch/child password resets, desktop and mobile rendering')
+    console.log('PASS: main-only pool controls, fixed 200 clients, supplied reset modal, custom main/branch passwords, optional child password generation, cancellation and selected-database isolation')
     return
   }
 
@@ -538,7 +565,7 @@ try {
   const previousPassword = (await services.clientRoles.get('branch_dev')).password
   await page.getByRole('button', { name: 'Reset database password', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Reset password', exact: true })).toBeDisabled()
-  await page.getByLabel('Confirm database name', { exact: true }).fill('branch_dev')
+  await page.getByLabel('New database password', { exact: true }).fill('chosen-branch-client-password')
   await page.getByRole('button', { name: 'Reset password', exact: true }).click()
   await expectToast('Database password reset. Use Connect to reveal the new password.')
   assert.notEqual((await services.clientRoles.get('branch_dev')).password, previousPassword)
