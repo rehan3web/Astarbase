@@ -9,6 +9,7 @@ COPY Frontend Frontend
 RUN pnpm --filter studio build
 
 FROM node:24-alpine
+LABEL org.opencontainers.image.title="Sorabase Studio"
 WORKDIR /app
 RUN corepack enable
 COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./

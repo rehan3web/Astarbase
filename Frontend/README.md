@@ -1,4 +1,4 @@
-# Astarbase Studio frontend
+# Sorabase Studio frontend
 
 The Next.js UI is connected to the backend; it has no mock database fallback.
 Run the full stack from the repository root using the instructions in `../README.md`.

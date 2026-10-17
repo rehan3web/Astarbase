@@ -52,7 +52,7 @@ test('dump and restore use custom archives in the container, no host paths', asy
   assert.equal(await postgres.dump(config.DB_NAME, id), 1234);
   await postgres.restore(config.DB_NAME, id);
   assert.equal(commands[0][0], 'pg_dump');
-  assert.ok(commands[0].includes('/var/lib/astarbase/backups/' + id + '.dump'));
+  assert.ok(commands[0].includes('/var/lib/sorabase/backups/' + id + '.dump'));
   assert.ok(commands[2].includes('--single-transaction'));
   await assert.rejects(postgres.dump(config.DB_NAME, '../../oops'));
 });
@@ -134,7 +134,7 @@ test('PgBouncer forwards any database name and Compose persists separate admin a
   const pool = await readFile(new URL('../../docker/pgbouncer/entrypoint.mts', import.meta.url), 'utf8');
   assert.match(pool, /^\* = host=\/var\/run\/postgresql port=5432$/m);
   const compose = await readFile(new URL('../../docker-compose.yml', import.meta.url), 'utf8');
-  assert.match(compose, /- \.\/Backend\/backups:\/var\/lib\/astarbase\/backups/);
+  assert.match(compose, /- \.\/Backend\/backups:\/var\/lib\/sorabase\/backups/);
   assert.match(compose, /- \.\/Backend\/data:\/app\/Backend\/data/);
   assert.match(compose, /- \/var\/run\/docker\.sock:\/var\/run\/docker\.sock/);
 });

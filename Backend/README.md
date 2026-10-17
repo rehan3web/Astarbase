@@ -31,7 +31,7 @@ the frontend. Once Postgres is ready, the API performs the idempotent `db:push`:
 it initializes `Backend/data/admin.sqlite`, checks the project database using
 the `.env` credentials over the shared Postgres Unix socket, and imports legacy
 admin metadata if present, **before listening for requests**.
-The API opens `/var/run/astarbase/admin.sock` on the shared volume before HTTP
+The API opens `/var/run/sorabase/admin.sock` on the shared volume before HTTP
 health becomes ready. The frontend starts only after that healthcheck passes.
 No separate install, DB push or frontend startup command is needed on the host.
 
@@ -81,7 +81,7 @@ database operations still use a Postgres advisory lock, not a long SQLite write
 transaction.
 
 On upgrade from the previous Postgres admin catalog, `LEGACY_CONTROL_DB` (default
-`astarbase_control`, accepting the old `CONTROL_DB` setting) is read once and its
+`sorabase_control`, accepting the old `CONTROL_DB` setting) is read once and its
 inventory imported atomically into SQLite. The old database is **not deleted**.
 The old `postgres-backups` volume remains mounted read-only as an upgrade source;
 Postgres startup copies existing dump archives into `Backend/backups/`, without
@@ -149,7 +149,7 @@ Content-Type: application/json
 Never embed the token in browser JavaScript or a `NEXT_PUBLIC_*` variable. Call
 these endpoints from an authenticated Studio server-side route. Cross-origin
 browser requests are rejected. The connected frontend proxies `/api/studio/*`
-over `/var/run/astarbase/admin.sock` on the `admin-socket` volume. The API TCP
+over `/var/run/sorabase/admin.sock` on the `admin-socket` volume. The API TCP
 listener remains for healthchecks and authenticated, loopback-bound diagnostics;
 the frontend does not use it.
 
@@ -164,7 +164,7 @@ request can use the token-injecting proxy. On an HTTPS deployment, set
 `POST /api/sql`
 
 ```json
-{ "database": "astarbase", "sql": "SELECT * FROM public.users LIMIT 100" }
+{ "database": "sorabase", "sql": "SELECT * FROM public.users LIMIT 100" }
 ```
 
 Returns `{stdout, stderr, format: "csv", durationMs}`. `stdout` contains psql CSV
@@ -239,12 +239,12 @@ container** through Docker exec. Creation directly executes:
 
 ```text
 pg_dump --host /var/run/postgresql --username <DB_USER> --no-password \
-  --format=custom --file /var/lib/astarbase/backups/<backup-id>.dump \
+  --format=custom --file /var/lib/sorabase/backups/<backup-id>.dump \
   --dbname <database>
 ```
 
 No JavaScript SQL export or SQLite dump is used. The Postgres container path
-`/var/lib/astarbase/backups` is bind-mounted to the host's **`Backend/backups/`**
+`/var/lib/sorabase/backups` is bind-mounted to the host's **`Backend/backups/`**
 folder, so the dump command writes the archive there directly.
 Metadata lives in **`Backend/data/admin.sqlite`**; listing checks actual files via Docker and reports `available`
 and `actual_size_bytes`. Restore may target any managed database and requires its
@@ -272,11 +272,11 @@ accepted; unknown keys, credentials and row payloads are rejected.
 ## Verification
 
 ```sh
-pnpm --filter astarbase-backend typecheck
+pnpm --filter sorabase-backend typecheck
 pnpm build
 pnpm test
 # Requires local initdb, pg_ctl, psql, pg_dump and pg_restore, not Docker:
-pnpm --filter astarbase-backend test:integration
+pnpm --filter sorabase-backend test:integration
 ```
 
 The integration suite creates an isolated temporary Postgres cluster with TCP

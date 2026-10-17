@@ -14,8 +14,8 @@ export function recoveryStatement(user: string, password: string) {
   }
   let nonce: string;
   do { nonce = randomBytes(16).toString('hex'); } while (password.includes(nonce));
-  const tag = `$astarbase_${nonce}$`;
-  const marker = `ASTARBASE_RESET_OK_${nonce}`;
+  const tag = `$sorabase_${nonce}$`;
+  const marker = `SORABASE_RESET_OK_${nonce}`;
   // One complete standalone-backend statement. No plaintext in process arguments.
   const sql = `DO ${tag} BEGIN EXECUTE format('ALTER ROLE %I PASSWORD %L', ${literal(user)}, ${literal(password)}); RAISE NOTICE '${marker}'; END ${tag};\n`;
   return { sql, marker };
@@ -49,7 +49,7 @@ export function recoveryContainer(info: Docker.ContainerInspectInfo): Docker.Con
     Env: [`PGDATA=${pgdata}`],
     AttachStdin: true, AttachStdout: true, AttachStderr: true,
     OpenStdin: true, StdinOnce: true, Tty: false,
-    Labels: { 'astarbase.maintenance': 'password-recovery' },
+    Labels: { 'sorabase.maintenance': 'password-recovery' },
     HostConfig: {
       NetworkMode: 'none',
       ReadonlyRootfs: true,
@@ -143,7 +143,7 @@ export async function resetDatabasePassword(config: Config, confirmUser: string,
       if ((await helper.inspect()).State.Running) await helper.stop({ t: 30 });
       await helper.remove({ v: false });
     } catch {
-      throw new RecoveryError('Recovery helper cleanup failed. Keep Postgres stopped and inspect containers labelled astarbase.maintenance=password-recovery before restarting.');
+      throw new RecoveryError('Recovery helper cleanup failed. Keep Postgres stopped and inspect containers labelled sorabase.maintenance=password-recovery before restarting.');
     }
   }
 }

@@ -4,7 +4,7 @@ import { adminToken } from './session'
 // The browser never gets the service secret or contacts the private backend.
 // Authentication uses the same shared Unix socket as the other admin traffic.
 export async function adminAuth(path: '/auth/status' | '/auth/login', body?: { identifier: string; password: string }) {
-  const socketPath = process.env.ADMIN_SOCKET_PATH || '/var/run/astarbase/admin.sock'
+  const socketPath = process.env.ADMIN_SOCKET_PATH || '/var/run/sorabase/admin.sock'
   if (!socketPath.startsWith('/') || adminToken().length < 32) throw new Error('Admin login needs server-side setup.')
   const data = body ? JSON.stringify(body) : undefined
   return new Promise<{ status: number; data: { configured?: boolean; authenticated?: boolean; subject?: string; error?: string } }>((resolve, reject) => {

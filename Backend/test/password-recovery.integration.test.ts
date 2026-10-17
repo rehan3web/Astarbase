@@ -15,7 +15,7 @@ const run = promisify(execFile);
 test('offline password recovery preserves real SCRAM-authenticated databases, roles and auth rules', {
   skip: process.env.RUN_SOCKET_INTEGRATION !== '1', timeout: 60000,
 }, async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'astarbase-recovery-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'sorabase-recovery-'));
   const data = path.join(dir, 'data');
   const socket = path.join(dir, 'socket');
   const passwordFile = path.join(dir, 'password');

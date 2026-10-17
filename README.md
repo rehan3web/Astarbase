@@ -1,4 +1,21 @@
-# Astarbase
+# Sorabase
+
+## Fresh installation
+
+This project targets a fresh Sorabase installation. Copy `.env.example` to `.env`
+and supply your own strong credentials before running `docker compose up -d --build`.
+The default database is `sorabase`, the Unix-only admin role is `sorabase_admin`,
+and the public main-database client role is `sorabase_main`.
+
+Docker uses the `sorabase` Compose project, `sorabase-postgres` container and
+Sorabase-prefixed network/volumes. Internal roles and pooler authentication use
+`sorabase_client_roles` and `sorabase_pool_auth`. No previous product-name
+compatibility is required. The optional control-catalog import defaults to
+`sorabase_control`.
+
+Removing old installations, images, bind-mounted data or volumes is a separate
+destructive operation: back up anything you need before deleting it. This code
+does not delete another installation automatically.
 
 Single-machine Admin Studio with a connected Next.js frontend, Node.js/TypeScript
 backend, Postgres, PgBouncer, and SQLite admin settings.
@@ -105,7 +122,7 @@ or interpret an application login as a PostgreSQL role.
 
 Studio preferences are no longer shown in Database Settings. Each new branch,
 including a child branch, gets a non-superuser login with the branch name and a
-cryptographically random password. Main uses the separate `astarbase_main`
+cryptographically random password. New installations use the separate `sorabase_main`
 client login. Internal admin operations keep using `DB_USER` / `DB_PASSWORD`;
 Settings never rotates that internal credential.
 
@@ -302,12 +319,12 @@ clients must update their password. There will be maintenance downtime.
 git pull origin main
 docker compose build studio
 docker compose stop -t 60 frontend studio pgbouncer postgres
-docker compose run --rm --no-deps studio node dist/src/maintenance/reset-password.js --confirm-user astarbase_admin
+docker compose run --rm --no-deps studio node dist/src/maintenance/reset-password.js --confirm-user sorabase_admin
 # Only after "Password reset confirmed":
 docker compose up -d --wait
 ```
 
-Replace `astarbase_admin` with your configured `DB_USER` if different. With legacy
+Replace `sorabase_admin` with your configured `DB_USER` if different. With legacy
 `Backend/.env`, pass `--env-file Backend/.env` to every Compose command.
 The recovery command refuses a running Postgres server, reuses the exact same
 Postgres image/data mount, runs standalone maintenance with networking disabled,
@@ -321,7 +338,7 @@ the stated maintenance error; do not delete lock files or volumes.
 ```sh
 pnpm build
 pnpm test
-pnpm --filter astarbase-backend test:integration
+pnpm --filter sorabase-backend test:integration
 pnpm --filter studio test:integration
 ```
 

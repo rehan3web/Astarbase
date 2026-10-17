@@ -6,7 +6,7 @@ import type { Catalog } from '../admin/catalog.service.js';
 import { CredentialStore } from './credential-store.js';
 import { clientPassword } from './password.js';
 
-const group = 'astarbase_client_roles';
+const group = 'sorabase_client_roles';
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 
 export class ClientRolesService {
@@ -23,9 +23,9 @@ export class ClientRolesService {
         else if (existing.rows[0].rolcanlogin || existing.rows[0].rolsuper) {
           throw new Error('Reserved client role group conflicts with an existing privileged role');
         }
-        await client.query(`CREATE SCHEMA IF NOT EXISTS astarbase_pool_auth`);
-        await client.query('REVOKE ALL ON SCHEMA astarbase_pool_auth FROM PUBLIC');
-        await client.query(`CREATE OR REPLACE FUNCTION astarbase_pool_auth.lookup(username text)
+        await client.query(`CREATE SCHEMA IF NOT EXISTS sorabase_pool_auth`);
+        await client.query('REVOKE ALL ON SCHEMA sorabase_pool_auth FROM PUBLIC');
+        await client.query(`CREATE OR REPLACE FUNCTION sorabase_pool_auth.lookup(username text)
           RETURNS TABLE(usename text, passwd text)
           LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog AS $$
             SELECT rolname::text, rolpassword::text FROM pg_authid
@@ -33,10 +33,10 @@ export class ClientRolesService {
               AND (rolvaliduntil IS NULL OR rolvaliduntil > now())
               AND pg_has_role(oid, '${group}', 'member')
           $$`);
-        await client.query('REVOKE ALL ON FUNCTION astarbase_pool_auth.lookup(text) FROM PUBLIC');
+        await client.query('REVOKE ALL ON FUNCTION sorabase_pool_auth.lookup(text) FROM PUBLIC');
       });
       for (const branch of await this.catalog.branches()) {
-        await this.provision(branch.database_name, branch.parent_name ? branch.name : 'astarbase_main');
+        await this.provision(branch.database_name, branch.parent_name ? branch.name : 'sorabase_main');
       }
     });
   }

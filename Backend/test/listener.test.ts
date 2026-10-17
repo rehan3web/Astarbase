@@ -8,7 +8,7 @@ import express from 'express';
 import { startAdminListeners } from '../src/services/system/listener.service.js';
 
 test('production listener exposes the shared Unix API before HTTP health becomes ready', async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'astarbase-listener-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'sorabase-listener-'));
   const socketPath = path.join(dir, 'admin.sock');
   const app = express();
   app.get('/health', (_req, res) => res.json({ status: 'ok' }));
@@ -37,7 +37,7 @@ test('production listener exposes the shared Unix API before HTTP health becomes
 });
 
 test('startup never overwrites a non-socket file at the socket path', async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'astarbase-listener-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'sorabase-listener-'));
   const socketPath = path.join(dir, 'admin.sock');
   try {
     await writeFile(socketPath, 'keep me');

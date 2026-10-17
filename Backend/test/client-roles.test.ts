@@ -10,8 +10,35 @@ import { CredentialStore } from '../src/services/connection/credential-store.js'
 import { ClientRolesService } from '../src/services/connection/client-roles.service.js';
 import type { withDatabase } from '../src/db/socket.js';
 
+test('Sorabase startup preserves its saved main login and password', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'sorabase-saved-role-'));
+  const options = { ...config, ADMIN_DATA_DIR: directory };
+  const catalog = new Catalog(options);
+  t.after(async () => { catalog.store.close(); await rm(directory, { recursive: true, force: true }); });
+  catalog.exclusive = async operation => operation();
+  const statements: string[] = [];
+  const run = (async (_config, _database, operation) => operation({
+    async query(sql: string) {
+      statements.push(sql);
+      if (sql.startsWith('SELECT rolcanlogin')) return { rows: [{ rolcanlogin: false, rolsuper: false }], rowCount: 1 };
+      if (sql.startsWith('SELECT rolsuper')) return { rows: [{
+        rolsuper: false, rolcreatedb: false, rolcreaterole: false, managed: true,
+      }], rowCount: 1 };
+      if (sql.startsWith('SELECT nspname')) return { rows: [{ nspname: 'public' }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    },
+  } as unknown as pg.Client)) as typeof withDatabase;
+  const roles = new ClientRolesService(options, catalog, run);
+  const saved = { user: 'sorabase_main', password: 'saved-client-password-not-for-deployment' };
+  await roles.credentials.set(config.DB_NAME, saved);
+  await roles.initialize();
+  assert.deepEqual(await roles.get(config.DB_NAME), saved);
+  assert.ok(statements.some(sql => sql.startsWith('ALTER ROLE "sorabase_main" PASSWORD')));
+  assert.ok(statements.every(sql => !sql.includes('CREATE ROLE "sorabase_main"')));
+});
+
 test('client credentials are encrypted, private, durable and bound to their database', async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'astarbase-client-vault-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'sorabase-client-vault-'));
   try {
     const credential = { user: 'dev', password: 'private-client-fixture-only' };
     const vault = new CredentialStore(directory);
@@ -30,7 +57,7 @@ test('client credentials are encrypted, private, durable and bound to their data
 });
 
 test('main, branch and child get separate roles; resets and reprovision preserve other passwords', async t => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'astarbase-client-roles-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'sorabase-client-roles-'));
   const options = { ...config, ADMIN_DATA_DIR: directory };
   const catalog = new Catalog(options);
   t.after(async () => { catalog.store.close(); await rm(directory, { recursive: true, force: true }); });
@@ -62,7 +89,7 @@ test('main, branch and child get separate roles; resets and reprovision preserve
   const main = await roles.get(config.DB_NAME);
   const dev = await roles.get('branch_dev');
   const child = await roles.get('branch_child');
-  assert.equal(main.user, 'astarbase_main');
+  assert.equal(main.user, 'sorabase_main');
   assert.equal(dev.user, 'dev');
   assert.equal(child.user, 'child');
   assert.equal(new Set([main.password, dev.password, child.password, config.DB_PASSWORD]).size, 4);

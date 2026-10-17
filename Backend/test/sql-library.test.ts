@@ -9,7 +9,7 @@ import { AdminStore } from '../src/db/admin-store.js';
 import { config } from './helpers.js';
 
 test('SQL library persists documents, folders and favorites across SQLite reopen without Postgres', async t => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-library-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-library-'));
   const options = { ...config, ADMIN_DATA_DIR: dir };
   const services = createServices(options);
   t.after(() => { services.close(); rmSync(dir, { recursive: true, force: true }); });

@@ -3,7 +3,7 @@ import { chmod, lstat, mkdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { Express } from 'express';
 
-export const adminSocketPath = '/var/run/astarbase/admin.sock';
+export const adminSocketPath = '/var/run/sorabase/admin.sock';
 
 function listen(server: Server, target: number | string): Promise<void> {
   return new Promise((resolve, reject) => {

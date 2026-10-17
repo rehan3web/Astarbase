@@ -10,7 +10,7 @@ import { PoolerService } from '../src/services/connection/pooler.service.js';
 import type { DockerService } from '../src/services/docker/docker.js';
 
 test('pool settings use only the matching Compose container, reload once, reject branches and fixed-limit changes', async t => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'astarbase-pool-settings-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'sorabase-pool-settings-'));
   const options = { ...config, ADMIN_DATA_DIR: directory };
   const catalog = new Catalog(options);
   t.after(async () => { catalog.store.close(); await rm(directory, { recursive: true, force: true }); });

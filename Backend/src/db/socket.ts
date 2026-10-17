@@ -10,7 +10,7 @@ export function connection(config: Config, database: string): pg.ClientConfig {
     user: config.DB_USER,
     password: config.DB_PASSWORD,
     ssl: false,
-    application_name: 'astarbase-admin',
+    application_name: 'sorabase-admin',
     connectionTimeoutMillis: 10000,
     statement_timeout: config.SQL_TIMEOUT_MS,
     idle_in_transaction_session_timeout: 30000,

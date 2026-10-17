@@ -1,4 +1,5 @@
 FROM node:24-alpine
+LABEL org.opencontainers.image.title="Sorabase connection pooler"
 # Alpine ships a root-owned pgbouncer.ini; the non-root entrypoint rewrites it.
 RUN apk add --no-cache pgbouncer postgresql17-client \
     && addgroup -S studio-pool && adduser -S -D -H -G studio-pool studio-pool \

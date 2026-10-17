@@ -14,7 +14,7 @@ async function proxy(req: NextRequest, context: { params: Promise<{ path: string
       !['databases', 'branches', 'backups', 'sql', 'settings'].includes(path[0])) {
     return NextResponse.json({ error: 'Endpoint not allowed' }, { status: 404 })
   }
-  const socketPath = process.env.ADMIN_SOCKET_PATH || '/var/run/astarbase/admin.sock'
+  const socketPath = process.env.ADMIN_SOCKET_PATH || '/var/run/sorabase/admin.sock'
   if (!socketPath.startsWith('/')) return NextResponse.json({ error: 'ADMIN_SOCKET_PATH must be an absolute Unix socket path' }, { status: 503 })
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.from(await req.arrayBuffer())
   if (body && body.length > 1024 * 1024) return NextResponse.json({ error: 'Request exceeds 1 MiB' }, { status: 413 })

@@ -11,7 +11,7 @@ import { Catalog } from '../src/services/admin/catalog.service.js';
 import type { PostgresContainer } from '../src/services/docker/postgres.js';
 
 function fixture(t: TestContext) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-admin-test-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-admin-test-'));
   const options = { ...config, ADMIN_DATA_DIR: dir };
   const ctx = { store: new AdminStore(options), options };
   t.after(() => { ctx.store.close(); rmSync(dir, { recursive: true, force: true }); });
@@ -39,7 +39,15 @@ test('SQLite accepts only admin configuration and rejects secrets or row payload
   assert.throws(() => store.updateSettings({ DB_PASSWORD: 'never-persist-this' } as never));
   assert.throws(() => store.updateSettings({ tables: [{ private: true }] } as never));
   assert.throws(() => store.updateSettings({ defaultRowLimit: 0 }));
-  assert.deepEqual(store.settings(), { projectName: 'Astarbase', defaultRowLimit: 100, theme: 'system' });
+  assert.deepEqual(store.settings(), { projectName: 'Sorabase', defaultRowLimit: 100, theme: 'system' });
+});
+
+test('Sorabase uses its default display name and preserves custom names', t => {
+  const { store } = fixture(t);
+  store.updateSettings({ projectName: 'Sorabase' });
+  assert.equal(store.settings().projectName, 'Sorabase');
+  store.updateSettings({ projectName: 'My Sorabase workspace' });
+  assert.equal(store.settings().projectName, 'My Sorabase workspace');
 });
 
 test('branch tags are validated SQLite metadata, editable without Docker or Postgres, and survive restart', t => {

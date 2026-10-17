@@ -1,12 +1,12 @@
 {
-  "name": "astarbase",
+  "name": "sorabase",
   "private": true,
   "packageManager": "pnpm@10.26.1",
   "scripts": {
-    "setup": "pnpm --filter astarbase-backend setup",
-    "dev": "pnpm --filter astarbase-backend dev",
-    "build": "pnpm --filter astarbase-backend build && pnpm --filter studio build",
+    "setup": "pnpm --filter sorabase-backend setup",
+    "dev": "pnpm --filter sorabase-backend dev",
+    "build": "pnpm --filter sorabase-backend build && pnpm --filter studio build",
     "dev:studio": "pnpm --filter studio dev",
-    "test": "pnpm --filter astarbase-backend test && pnpm --filter studio test"
+    "test": "pnpm --filter sorabase-backend test && pnpm --filter studio test"
   }
 }

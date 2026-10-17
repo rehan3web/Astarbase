@@ -20,7 +20,7 @@ export class PoliciesService {
         c.relrowsecurity AS enabled,c.relforcerowsecurity AS forced
         FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE c.relkind IN ('r','p') AND n.nspname NOT LIKE 'pg\\_%'
-          AND n.nspname NOT IN ('information_schema','astarbase_pool_auth')
+          AND n.nspname NOT IN ('information_schema','sorabase_pool_auth')
         ORDER BY n.nspname,c.relname`);
       const policies = await client.query(`SELECT schemaname,tablename,policyname AS name,
         cmd AS command,permissive AS mode,roles::text[] AS roles,qual AS "usingExpression",
@@ -36,7 +36,7 @@ export class PoliciesService {
 
   private async transaction<T>(database: string, schema: string, table: string, operation: (client: pg.Client, target: string) => Promise<T>) {
     await this.catalog.assertDatabase(database);
-    if (schema === 'information_schema' || schema.startsWith('pg_') || schema === 'astarbase_pool_auth') {
+    if (schema === 'information_schema' || schema.startsWith('pg_') || schema === 'sorabase_pool_auth') {
       throw new HttpError(400, 'System schemas cannot be managed here');
     }
     const target = `${qi(schema)}.${qi(table)}`;

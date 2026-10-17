@@ -26,6 +26,7 @@ function MetricCard({ title, value, badges }: { title: string; value: React.Reac
 
 export function ProjectHomeView() {
   const { database, branch, branches, settings } = useStudio()
+  const projectName = settings?.projectName || 'Sorabase'
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [metricsKey, setMetricsKey] = useState('')
   const [loading, setLoading] = useState(true)
@@ -104,7 +105,7 @@ export function ProjectHomeView() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-default">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">{settings?.projectName || 'Astarbase'}</h1>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">{projectName}</h1>
             <Badge variant="brand" className="text-xs px-2 py-0.5">{branch?.name || 'Connected'}</Badge>
           </div>
           <p className="text-sm text-foreground-lighter mt-1 flex flex-wrap items-center gap-2">

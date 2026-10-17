@@ -9,13 +9,13 @@ import { config } from './helpers.js';
 import { loadConfig } from '../src/config.js';
 
 test('connection metadata and explicit password reveal require admin auth and managed databases', async t => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-connection-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-connection-'));
   const options = { ...config, ADMIN_DATA_DIR: dir, DATABASE_PUBLIC_HOST: 'db.example.com',
     POSTGRES_PUBLIC_PORT: 15432, PGBOUNCER_PUBLIC_PORT: 16432 };
   const services = createServices(options);
   t.after(() => { services.close(); rmSync(dir, { recursive: true, force: true }); });
   services.catalog.store.addBranch('dev', 'branch_dev', 'main');
-  const mainCredential = { user: 'astarbase_main', password: 'main-client-fixture-password' };
+  const mainCredential = { user: 'sorabase_main', password: 'main-client-fixture-password' };
   const branchCredential = { user: 'dev', password: 'branch-client-fixture-password' };
   await services.clientRoles.credentials.set(config.DB_NAME, mainCredential);
   await services.clientRoles.credentials.set('branch_dev', branchCredential);

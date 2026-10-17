@@ -18,7 +18,7 @@ case "$pgdata" in
   *[!a-zA-Z0-9_./-]*) echo "Unsupported characters in PGDATA" >&2; exit 1 ;;
 esac
 cat <<EOF
-# Astarbase internal admin is Unix-only. Keep these rules before the include.
+# Sorabase internal admin is Unix-only. Keep these rules before the include.
 local all "$admin" scram-sha-256
 host all "$admin" 0.0.0.0/0 reject
 host all "$admin" ::/0 reject

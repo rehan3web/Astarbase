@@ -12,7 +12,7 @@ import type { BranchService } from '../src/services/branches/branches.service.js
 import type { withDatabase } from '../src/db/socket.js';
 
 test('maintenance endpoints require auth, an exact managed database, and explicit confirmation', async t => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'astarbase-maintenance-api-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'sorabase-maintenance-api-'));
   const options = { ...config, ADMIN_DATA_DIR: directory };
   const services = createServices(options);
   t.after(async () => { services.close(); await rm(directory, { recursive: true, force: true }); });
@@ -49,7 +49,7 @@ test('maintenance endpoints require auth, an exact managed database, and explici
 });
 
 test('maintenance targets only the selected database; preserves Unix clients and propagates failures', async t => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'astarbase-maintenance-service-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'sorabase-maintenance-service-'));
   const services = createServices({ ...config, ADMIN_DATA_DIR: directory });
   t.after(async () => { services.close(); await rm(directory, { recursive: true, force: true }); });
   services.catalog.store.addBranch('dev', 'branch_dev', 'main');

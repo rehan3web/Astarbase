@@ -15,7 +15,7 @@ export async function verifyPoliciesUi(page: Page, url: string, services: Servic
   const dialog = page.getByRole('dialog')
   const sql = dialog.getByRole('textbox', { name: 'Policy SQL', exact: true })
   const source = (name: string, command: PolicyCommand = 'SELECT', predicate = 'tenant_id=1') => buildPolicySql({
-    name, command, mode: 'PERMISSIVE', roles: ['astarbase_main'],
+    name, command, mode: 'PERMISSIVE', roles: ['sorabase_main'],
     usingExpression: command === 'INSERT' ? null : predicate,
     checkExpression: command === 'SELECT' || command === 'DELETE' ? null : predicate,
   }, 'public', 'rls_browser')
@@ -103,7 +103,7 @@ export async function verifyPoliciesUi(page: Page, url: string, services: Servic
   await snapshot('rls-create-policy')
   await save()
   assert.equal((await state()).policies[0].command, 'SELECT')
-  assert.deepEqual((await state()).policies[0].roles, ['astarbase_main'])
+  assert.deepEqual((await state()).policies[0].roles, ['sorabase_main'])
   await page.getByRole('button', { name: 'Edit policy tenant_read', exact: true }).click()
   await sql.fill(source('tenant_read', 'SELECT', 'nonexistent_rls_column=1'))
   await dialog.getByRole('button', { name: 'Save policy', exact: true }).click()

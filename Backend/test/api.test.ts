@@ -9,7 +9,7 @@ function fixture() {
   const calls: unknown[][] = [];
   const capture = (name: string, result: unknown) => async (...args: unknown[]) => { calls.push([name, ...args]); return result; };
   const branch = { name: 'dev', database_name: 'branch_dev', parent_name: 'main', tag: 'dev' };
-  let settings = { projectName: 'Astarbase', defaultRowLimit: 100, theme: 'system' };
+  let settings = { projectName: 'Sorabase', defaultRowLimit: 100, theme: 'system' };
   const services = {
     health: capture('health', undefined),
     metrics: {
@@ -175,7 +175,7 @@ test('numeric process error codes still produce JSON error responses', async () 
 test('admin settings routes validate allowlisted settings and apply default row limit', async () => {
   const { app, auth, calls } = fixture();
   await request(app).get('/api/settings').expect(401);
-  await request(app).get('/api/settings').set(auth).expect(200, { projectName: 'Astarbase', defaultRowLimit: 100, theme: 'system' });
+  await request(app).get('/api/settings').set(auth).expect(200, { projectName: 'Sorabase', defaultRowLimit: 100, theme: 'system' });
   await request(app).patch('/api/settings').set(auth).send({ defaultRowLimit: 25, theme: 'dark' }).expect(200);
   await request(app).get('/api/databases/test_project/tables/public/items/rows').set(auth).expect(200);
   assert.deepEqual(calls.at(-1), ['rows', 'test_project', 'public', 'items', 25, 0]);

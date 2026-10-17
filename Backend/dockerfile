@@ -6,9 +6,10 @@ COPY Backend/package.json Backend/package.json
 COPY Frontend/package.json Frontend/package.json
 RUN pnpm install --frozen-lockfile
 COPY Backend Backend
-RUN pnpm --filter astarbase-backend build
+RUN pnpm --filter sorabase-backend build
 
 FROM node:24-alpine
+LABEL org.opencontainers.image.title="Sorabase API"
 WORKDIR /app
 RUN corepack enable
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./

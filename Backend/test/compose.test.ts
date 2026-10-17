@@ -8,7 +8,7 @@ import { projectDir } from '../src/config.js';
 
 const available = spawnSync('docker', ['compose', 'version'], { stdio: 'ignore' }).status === 0;
 test('Compose alone loads root .env and wires all four services in dependency order', { skip: !available }, () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-compose-test-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-compose-test-'));
   try {
     // No daemon or real credentials: `config` only validates/interpolates YAML.
     const token = 'compose-test-token-not-for-deployment-00000000';
@@ -23,7 +23,12 @@ test('Compose alone loads root .env and wires all four services in dependency or
       '--project-directory', dir, '-f', path.join(projectDir, 'docker-compose.yml'), 'config', '--format', 'json'], {
       cwd: dir, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: process.env.HOME },
     });
-    const { services } = JSON.parse(output);
+    const { name, services, volumes, networks } = JSON.parse(output);
+    assert.equal(name, 'sorabase');
+    assert.equal(services.postgres.container_name, 'sorabase-postgres');
+    assert.equal(services.studio.environment.LEGACY_CONTROL_DB, 'sorabase_control');
+    assert.equal(volumes['postgres-data'].name, 'sorabase_postgres-data');
+    assert.equal(networks.sorabase.name, 'sorabase_sorabase');
     assert.deepEqual(Object.keys(services).sort(), ['frontend', 'pgbouncer', 'postgres', 'studio']);
     assert.equal(services.postgres.environment.POSTGRES_DB, 'compose_project');
     assert.equal(services.studio.environment.AUTO_START_COMPOSE, 'false');
@@ -35,9 +40,9 @@ test('Compose alone loads root .env and wires all four services in dependency or
     assert.equal(services.frontend.depends_on.studio.condition, 'service_healthy');
     assert.equal(services.studio.depends_on.postgres.condition, 'service_healthy');
     assert.equal(services.studio.depends_on.pgbouncer.condition, 'service_healthy');
-    assert.equal(services.frontend.environment.ADMIN_SOCKET_PATH, '/var/run/astarbase/admin.sock');
-    assert.ok(services.frontend.volumes.some((v: { target: string }) => v.target === '/var/run/astarbase'));
-    assert.ok(services.studio.volumes.some((v: { target: string }) => v.target === '/var/run/astarbase'));
+    assert.equal(services.frontend.environment.ADMIN_SOCKET_PATH, '/var/run/sorabase/admin.sock');
+    assert.ok(services.frontend.volumes.some((v: { target: string }) => v.target === '/var/run/sorabase'));
+    assert.ok(services.studio.volumes.some((v: { target: string }) => v.target === '/var/run/sorabase'));
     assert.equal(services.frontend.volumes.some((v: { target: string }) => v.target === '/var/run/docker.sock'), false);
     assert.ok(services.studio.build.dockerfile.endsWith('Backend/dockerfile'));
     assert.ok(services.frontend.build.dockerfile.endsWith('Frontend/dockerfile'));

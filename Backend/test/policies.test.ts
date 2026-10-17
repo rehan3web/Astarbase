@@ -8,7 +8,7 @@ import { createApp, createServices } from '../src/index.js';
 import { config } from './helpers.js';
 
 test('RLS APIs authenticate, scope managed databases and validate policy command/predicates and partial state', async t => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'astarbase-rls-api-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'sorabase-rls-api-'));
   const services = createServices({ ...config, ADMIN_DATA_DIR: directory });
   t.after(async () => { services.close(); await rm(directory, { recursive: true, force: true }); });
   services.catalog.store.addBranch('dev', 'branch_dev', 'main');

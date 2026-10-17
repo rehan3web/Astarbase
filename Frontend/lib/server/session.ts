@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
-export const COOKIE = 'astarbase_session'
+export const COOKIE = 'sorabase_session'
 export function adminToken() { return process.env.ADMIN_API_TOKEN ?? '' }
 export function sessionSecret() {
   const secret = process.env.SESSION_SECRET ?? ''

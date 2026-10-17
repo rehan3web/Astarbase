@@ -10,7 +10,7 @@ import { config } from './helpers.js';
 
 const password = 'Test-password-only-not-for-use-2026';
 function fixture(t: TestContext, bootstrap = true) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-auth-test-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-auth-test-'));
   const options = { ...config, ADMIN_DATA_DIR: dir,
     ADMIN_USERNAME: bootstrap ? 'studio_owner' : '',
     ADMIN_EMAIL: bootstrap ? 'owner@example.test' : '',
@@ -48,7 +48,7 @@ test('admin signs in with username or email, with protected internal routes and 
   }
   await request(app).post('/api/auth/login').set(auth).send({ token: config.ADMIN_API_TOKEN }).expect(400);
   await request(app).post('/api/auth/login').set(auth).send({ identifier: 'studio_owner', password: 'x'.repeat(257) }).expect(400);
-  assert.equal(services.catalog.store.settings().projectName, 'Astarbase');
+  assert.equal(services.catalog.store.settings().projectName, 'Sorabase');
 });
 
 test('no account means setup required, never default credentials or open registration', async t => {

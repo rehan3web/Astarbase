@@ -6,7 +6,7 @@ import { Box, ChevronsUpDown } from 'lucide-react'
 import { CommandPalette } from '@/components/interfaces/CommandPalette'
 import { ConnectPopover } from '@/components/interfaces/ConnectPopover'
 import { BranchSwitcher } from '@/components/interfaces/BranchSwitcher'
-import { SupabaseLogo } from '@/components/ui/icons'
+import { SorabaseLogo } from '@/components/ui/SorabaseLogo'
 import { useStudio } from '@/components/providers/StudioProvider'
 
 const DatabaseLogo = ({ className }: { className?: string }) => (
@@ -21,6 +21,7 @@ const DatabaseLogo = ({ className }: { className?: string }) => (
 
 export function AppHeader({ title }: { title?: string }) {
   const { database: dbName, settings } = useStudio()
+  const projectName = settings?.projectName || 'Sorabase'
 
   return (
     <header className="h-12 shrink-0 border-b border-default bg-dash-sidebar flex items-center justify-between px-4 z-20">
@@ -29,9 +30,10 @@ export function AppHeader({ title }: { title?: string }) {
         <Link
           href="/"
           className="mr-2 p-1 rounded-md hover:bg-surface-200 transition-colors flex items-center justify-center text-brand-500"
-          title="Supabase Studio"
+          title="Sorabase Studio"
+          aria-label="Sorabase Studio"
         >
-          <SupabaseLogo size={24} />
+          <SorabaseLogo size={26} />
         </Link>
         <span className="text-foreground-muted/60 mx-1 font-light">/</span>
 
@@ -40,7 +42,7 @@ export function AppHeader({ title }: { title?: string }) {
           className="flex items-center gap-1.5 hover:bg-surface-200 px-2 py-1 rounded-md transition-colors"
         >
           <Box className="h-4 w-4 text-foreground-lighter" />
-          <span className="font-medium text-foreground">{settings?.projectName || 'Astarbase'}</span>
+          <span className="font-medium text-foreground">{projectName}</span>
           <ChevronsUpDown className="h-3.5 w-3.5 text-foreground-muted ml-0.5" />
         </Link>
 

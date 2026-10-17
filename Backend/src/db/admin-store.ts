@@ -22,7 +22,7 @@ export const settingsSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']),
 }).strict();
 export type AdminSettings = z.infer<typeof settingsSchema>;
-const defaults: AdminSettings = { projectName: 'Astarbase', defaultRowLimit: 100, theme: 'system' };
+const defaults: AdminSettings = { projectName: 'Sorabase', defaultRowLimit: 100, theme: 'system' };
 
 // SQLite contains admin settings, inventory and salted authentication hashes.
 // Plaintext login passwords are never stored. Application rows and
@@ -136,7 +136,8 @@ export class AdminStore {
   }
   settings(): AdminSettings {
     const rows = this.db.prepare('SELECT key,value FROM admin_settings').all();
-    return settingsSchema.parse({ ...defaults, ...Object.fromEntries(rows.map(row => [row.key, JSON.parse(String(row.value))])) });
+    const saved = Object.fromEntries(rows.map(row => [row.key, JSON.parse(String(row.value))]));
+    return settingsSchema.parse({ ...defaults, ...saved });
   }
   updateSettings(changes: Partial<AdminSettings>): AdminSettings {
     // Keep credentials, SQL and dumps out of the settings map. Saved editor SQL

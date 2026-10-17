@@ -33,7 +33,7 @@ test('original-style activity uses actual row deltas, with gaps, resets and zero
 });
 
 test('SQLite activity bars aggregate all real events, preserve branch isolation and have no dummy totals', t => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-activity-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-activity-'));
   const store = new AdminStore({ ...config, ADMIN_DATA_DIR: dir });
   t.after(() => { store.close(); rmSync(dir, { recursive: true, force: true }); });
   const now = Date.now();
@@ -63,7 +63,7 @@ test('bars start with one, grow only on elapsed hourly boundaries, and roll afte
 });
 
 test('SQLite chart origin survives reopen and retention, preserving progression without backfilling blanks', t => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-progressive-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-progressive-'));
   const first = Date.now(), hour = 3600000;
   let store = new AdminStore({ ...config, ADMIN_DATA_DIR: dir });
   t.after(() => { store.close(); rmSync(dir, { recursive: true, force: true }); });
@@ -84,7 +84,7 @@ test('SQLite chart origin survives reopen and retention, preserving progression 
 });
 
 test('upgrade backfills the chart origin from existing SQLite history without deleting it', t => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-chart-upgrade-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-chart-upgrade-'));
   let store = new AdminStore({ ...config, ADMIN_DATA_DIR: dir });
   t.after(() => { store.close(); rmSync(dir, { recursive: true, force: true }); });
   const first = Date.now() - 3600000;

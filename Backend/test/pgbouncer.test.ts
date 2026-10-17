@@ -10,7 +10,7 @@ import { writePoolConfig } from '../../docker/pgbouncer/entrypoint.mts';
 const fixture = { DB_USER: 'test_admin', DB_PASSWORD: 'test-only-$;"quoted"\\password' };
 
 test('TypeScript PgBouncer configuration preserves wildcard Unix routing and private file modes', async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'astarbase-pool-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'sorabase-pool-'));
   try {
     // Simulate the preinstalled package file; existing modes must also be tightened.
     await writeFile(path.join(dir, 'pgbouncer.ini'), 'old package config', { mode: 0o644 });
@@ -33,7 +33,7 @@ test('TypeScript PgBouncer configuration preserves wildcard Unix routing and pri
     assert.match(config, /^auth_user = test_admin$/m);
     assert.match(config, /^admin_users = test_admin$/m);
     assert.match(config, /^auth_dbname = postgres$/m);
-    assert.match(config, /^auth_query = SELECT usename, passwd FROM astarbase_pool_auth.lookup\(\$1\)$/m);
+    assert.match(config, /^auth_query = SELECT usename, passwd FROM sorabase_pool_auth.lookup\(\$1\)$/m);
     assert.match(config, /^reserve_pool_size = 0$/m);
     assert.equal(config.includes(fixture.DB_PASSWORD), false);
     assert.equal(await readFile(path.join(dir, 'users.txt'), 'utf8'), `"test_admin" "${fixture.DB_PASSWORD.replaceAll('"', '""')}"\n`);
@@ -43,7 +43,7 @@ test('TypeScript PgBouncer configuration preserves wildcard Unix routing and pri
 });
 
 test('pool size survives container startup and invalid persisted sizes fail explicitly', async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'astarbase-pool-size-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'sorabase-pool-size-'));
   try {
     await writeFile(path.join(dir, 'pool-size'), '35');
     const file = await writePoolConfig(dir, fixture);
@@ -56,7 +56,7 @@ test('pool size survives container startup and invalid persisted sizes fail expl
 });
 
 test('invalid pool credentials fail before touching config files and never appear in errors', async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'astarbase-pool-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'sorabase-pool-'));
   try {
     const file = path.join(dir, 'pgbouncer.ini');
     await writeFile(file, 'preserve');
@@ -73,7 +73,7 @@ test('invalid pool credentials fail before touching config files and never appea
 });
 
 test('Node 24 runs the TypeScript entrypoint natively and hands control to PgBouncer without a shell', async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'astarbase-pool-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'sorabase-pool-'));
   try {
     const script = `
       import assert from 'node:assert/strict';

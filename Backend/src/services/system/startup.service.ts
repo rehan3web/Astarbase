@@ -57,7 +57,7 @@ export function formatStartupFailure(error: unknown, env: NodeJS.ProcessEnv = pr
   else if (stage === 'docker') hint = 'Check the /var/run/docker.sock mount, local Docker permissions/API compatibility, and POSTGRES_CONTAINER.';
   else if (stage === 'database' && code === '28P01') hint = 'Postgres rejected the credentials. Changing .env does not change credentials inside an existing database volume; use the matching credentials. Do not delete volumes.';
   else if (stage === 'database') hint = 'Check the shared /var/run/postgresql volume and the existing project database. Do not delete volumes.';
-  else if (stage === 'listeners') hint = 'Check the shared /var/run/astarbase volume permissions and whether the health port is already in use.';
+  else if (stage === 'listeners') hint = 'Check the shared /var/run/sorabase volume permissions and whether the health port is already in use.';
   return redact(`Startup failed [${stage}]${suffix ? ` (${suffix})` : ''}: ${message}`, env) +
     (hint ? `\nHint: ${hint}` : '') + '\nAdmin API not started. No TCP fallback is allowed.';
 }

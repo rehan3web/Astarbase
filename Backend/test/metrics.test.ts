@@ -19,7 +19,7 @@ const reading: DatabaseReading = {
   databaseOid: '16384', statsResetAt: null,
 };
 function fixture(t: TestContext) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-metrics-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-metrics-'));
   const options = { ...config, ADMIN_DATA_DIR: dir };
   const services = createServices(options);
   let now = Date.now(), failDatabase = false, failCompute = false, calls = 0;
@@ -129,7 +129,7 @@ test('container CPU follows Docker deltas and Linux memory excludes inactive fil
 });
 
 test('Docker stats use dockerode through a real Unix socket, never a TCP endpoint', async t => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'astarbase-docker-stats-')), socket = path.join(dir, 'docker.sock');
+  const dir = mkdtempSync(path.join(tmpdir(), 'sorabase-docker-stats-')), socket = path.join(dir, 'docker.sock');
   const server = createServer((req, res) => {
     assert.match(req.url!, /\/containers\/[^/]+\/stats\?stream=false/);
     assert.equal(req.socket.remoteAddress, undefined);

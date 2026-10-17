@@ -1,9 +1,9 @@
-name: astarbase
+name: ${COMPOSE_PROJECT_NAME:-sorabase}
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: ${POSTGRES_CONTAINER:-astarbase-postgres}
-    entrypoint: ["sh", "/usr/local/bin/astarbase-entrypoint.sh"]
+    container_name: ${POSTGRES_CONTAINER:-sorabase-postgres}
+    entrypoint: ["sh", "/usr/local/bin/sorabase-entrypoint.sh"]
     environment:
       POSTGRES_DB: ${DB_NAME:?Set DB_NAME in .env or pass --env-file Backend/.env}
       POSTGRES_USER: ${DB_USER:?Set DB_USER}
@@ -22,18 +22,18 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - postgres-socket:/var/run/postgresql
-      - ./Backend/backups:/var/lib/astarbase/backups
+      - ./Backend/backups:/var/lib/sorabase/backups
       # Read-only upgrade source; old archives are copied without deletion.
-      - postgres-backups:/var/lib/astarbase/legacy-backups:ro
-      - ./docker/postgres/entrypoint.sh:/usr/local/bin/astarbase-entrypoint.sh:ro
-      - ./docker/postgres/network-policy.sh:/usr/local/bin/astarbase-network-policy.sh:ro
+      - postgres-backups:/var/lib/sorabase/legacy-backups:ro
+      - ./docker/postgres/entrypoint.sh:/usr/local/bin/sorabase-entrypoint.sh:ro
+      - ./docker/postgres/network-policy.sh:/usr/local/bin/sorabase-network-policy.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h /var/run/postgresql -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 30
     restart: unless-stopped
-    networks: [astarbase]
+    networks: [sorabase]
 
   pgbouncer:
     build: ./docker/pgbouncer
@@ -54,7 +54,7 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
-    networks: [astarbase]
+    networks: [sorabase]
 
   studio:
     build:
@@ -64,7 +64,7 @@ services:
       DB_NAME: ${DB_NAME:?Set DB_NAME}
       DB_USER: ${DB_USER:?Set DB_USER}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
-      LEGACY_CONTROL_DB: ${LEGACY_CONTROL_DB:-${CONTROL_DB:-astarbase_control}}
+      LEGACY_CONTROL_DB: ${LEGACY_CONTROL_DB:-${CONTROL_DB:-sorabase_control}}
       DATABASE_PUBLIC_HOST: ${DATABASE_PUBLIC_HOST:-}
       POSTGRES_PUBLIC_PORT: ${POSTGRES_PUBLIC_PORT:-5432}
       PGBOUNCER_PUBLIC_PORT: ${PGBOUNCER_PUBLIC_PORT:-6432}
@@ -77,13 +77,13 @@ services:
       PORT: "8000"
       DOCKER_SOCKET: /var/run/docker.sock
       PG_SOCKET_DIR: /var/run/postgresql
-      POSTGRES_CONTAINER: ${POSTGRES_CONTAINER:-astarbase-postgres}
+      POSTGRES_CONTAINER: ${POSTGRES_CONTAINER:-sorabase-postgres}
       SQL_TIMEOUT_MS: ${SQL_TIMEOUT_MS:-30000}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - postgres-socket:/var/run/postgresql
       - ./Backend/data:/app/Backend/data
-      - admin-socket:/var/run/astarbase
+      - admin-socket:/var/run/sorabase
     ports:
       - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
     depends_on:
@@ -98,7 +98,7 @@ services:
       retries: 30
       start_period: 30s
     restart: unless-stopped
-    networks: [astarbase]
+    networks: [sorabase]
 
   frontend:
     build:
@@ -107,10 +107,10 @@ services:
     environment:
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN}
       SESSION_SECRET: ${SESSION_SECRET:?Set a new SESSION_SECRET of at least 32 characters}
-      ADMIN_SOCKET_PATH: /var/run/astarbase/admin.sock
+      ADMIN_SOCKET_PATH: /var/run/sorabase/admin.sock
       STUDIO_COOKIE_SECURE: ${STUDIO_COOKIE_SECURE:-false}
     volumes:
-      - admin-socket:/var/run/astarbase
+      - admin-socket:/var/run/sorabase
     ports:
       - "0.0.0.0:${STUDIO_PORT:-5000}:5000"
     depends_on:
@@ -123,10 +123,10 @@ services:
       retries: 20
       start_period: 30s
     restart: unless-stopped
-    networks: [astarbase]
+    networks: [sorabase]
 
 networks:
-  astarbase:
+  sorabase:
     driver: bridge
 volumes:
   postgres-data:

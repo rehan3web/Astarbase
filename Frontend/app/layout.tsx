@@ -8,8 +8,13 @@ import { StudioProvider } from '@/components/providers/StudioProvider'
 import { NotificationProvider } from '@/components/providers/NotificationProvider'
 
 export const metadata: Metadata = {
-  title: 'Astarbase Studio',
-  description: 'Supabase Studio Lite Database UI',
+  title: 'Sorabase Studio',
+  description: 'A self-hosted Postgres console for developers managing isolated branches.',
+  icons: {
+    icon: '/sorabase-icon.png',
+    shortcut: '/sorabase-icon.png',
+    apple: '/sorabase-icon.png',
+  },
 }
 
 export default function RootLayout({

@@ -19,7 +19,7 @@ test('Postgres guard rejects admin over IPv4/IPv6 including replication and pres
   const entry = readFileSync(path.join(projectDir, 'docker/postgres/entrypoint.sh'), 'utf8');
   assert.ok(entry.includes('hba_file=$policy'));
   const compose = readFileSync(path.join(projectDir, 'docker-compose.yml'), 'utf8');
-  assert.ok(compose.includes('./docker/postgres/network-policy.sh:/usr/local/bin/astarbase-network-policy.sh:ro'));
+  assert.ok(compose.includes('./docker/postgres/network-policy.sh:/usr/local/bin/sorabase-network-policy.sh:ro'));
 });
 
 test('invalid policy inputs fail closed instead of generating injectable authentication rules', () => {
