@@ -1,14 +1,14 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CircleHelp, LockKeyhole, Pencil, Plus, RefreshCw, Search, Shield, ShieldOff, Table as TableIcon, Trash2 } from 'lucide-react'
+import { Check, ChevronsUpDown, Pencil, Plus, RefreshCw, Search, Shield, ShieldOff, Table as TableIcon, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ConfirmRlsChangeDialog } from './ConfirmRlsChangeDialog'
 import type { RlsConfirmation } from './ConfirmRlsChangeDialog'
 import { PolicyDialog } from './PolicyDialog'
@@ -30,6 +30,8 @@ export function PoliciesPageView() {
   const [catalog, setCatalog] = useState<RlsCatalog | null>(null)
   const [selectedId, setSelectedId] = useState('')
   const [search, setSearch] = useState('')
+  const [tableDropdownOpen, setTableDropdownOpen] = useState(false)
+  const tableOptions = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [operationError, setOperationError] = useState('')
@@ -62,6 +64,7 @@ export function PoliciesPageView() {
     const controller = new AbortController()
     setCatalog(null)
     setSelectedId('')
+    setTableDropdownOpen(false)
     setSearch('')
     setError('')
     setOperationError('')
@@ -152,15 +155,53 @@ export function PoliciesPageView() {
     }
   }
 
-  const selection = <Select value={current ? selectedId : undefined} onValueChange={setSelectedId}>
-    <SelectTrigger aria-label="Policy table" className="h-9 min-w-0 max-w-full bg-surface-100 text-xs sm:w-[19rem]">
-      <SelectValue placeholder={loading ? 'Loading tables…' : 'Select a table'} />
-    </SelectTrigger>
-    <SelectContent className="max-h-80">
-      {filteredTables.map(table => <SelectItem key={tableId(table)} value={tableId(table)}>{table.schema}.{table.name}</SelectItem>)}
-      {!filteredTables.length && <div className="px-3 py-2 text-xs text-foreground-lighter">No tables match this search.</div>}
-    </SelectContent>
-  </Select>
+  const selection = <Popover open={tableDropdownOpen} onOpenChange={open => { setTableDropdownOpen(open); setSearch('') }}>
+    <PopoverTrigger asChild>
+      <Button variant="default" role="combobox" aria-label="Policy table" aria-expanded={tableDropdownOpen} aria-controls="policy-table-options" aria-haspopup="listbox" className="h-9 min-w-0 max-w-full justify-between text-xs sm:w-[19rem]">
+        <TableIcon className="mr-2 h-3.5 w-3.5 shrink-0 text-foreground-lighter" />
+        <span className="mr-auto truncate">{current ? `${current.schema}.${current.name}` : loading ? 'Loading tables…' : 'Select a table'}</span>
+        <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 text-foreground-lighter" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent align="start" sideOffset={6} className="w-72 overflow-hidden rounded-md border-default bg-surface-100 p-0 text-foreground shadow-2xl">
+      <div className="border-b border-default bg-surface-75/40 p-2">
+        <Input aria-label="Search tables" placeholder="Search tables..." iconLeft={<Search className="h-3.5 w-3.5" />} value={search} onChange={event => setSearch(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              const options = tableOptions.current?.querySelectorAll<HTMLButtonElement>('[role="option"]')
+              options?.[event.key === 'ArrowDown' ? 0 : options.length - 1]?.focus()
+            }
+          }}
+          className="h-8 border-strong bg-surface-200 text-xs" />
+      </div>
+      <div className="p-1">
+        <div className="px-2 py-1 text-[11px] font-medium text-foreground-lighter">Tables ({filteredTables.length})</div>
+        <div ref={tableOptions} id="policy-table-options" role="listbox" aria-label="Tables" className="max-h-[175px] space-y-0.5 overflow-y-auto pr-1">
+          {filteredTables.map(table => {
+            const selected = tableId(table) === selectedId
+            return <button key={tableId(table)} type="button" role="option" aria-selected={selected}
+              onClick={() => { setSelectedId(tableId(table)); setTableDropdownOpen(false); setSearch('') }}
+              onKeyDown={event => {
+                if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+                event.preventDefault()
+                const options = Array.from(tableOptions.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [])
+                const index = options.indexOf(event.currentTarget)
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
+                  : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length
+                options[next]?.focus()
+              }}
+              className={`flex h-[34px] w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs outline-none focus-visible:ring-1 focus-visible:ring-strong ${selected ? 'bg-surface-200 font-medium text-foreground' : 'text-foreground-light hover:bg-surface-200 hover:text-foreground'}`}>
+              <TableIcon className="h-3.5 w-3.5 shrink-0 text-foreground-lighter" />
+              <span className="truncate">{table.schema}.{table.name}</span>
+              {selected && <Check className="ml-auto h-3.5 w-3.5 shrink-0" />}
+            </button>
+          })}
+          {!filteredTables.length && <div className="px-2 py-4 text-center text-xs text-foreground-lighter">{catalog?.tables.length ? 'No tables match this search.' : 'No tables in this database.'}</div>}
+        </div>
+      </div>
+    </PopoverContent>
+  </Popover>
 
   return <div className="h-full w-full flex-1 overflow-y-auto p-5 md:p-9">
     <div className="mx-auto max-w-6xl space-y-6">
@@ -175,52 +216,33 @@ export function PoliciesPageView() {
         <Button variant="default" size="small" onClick={() => void load()} disabled={loading}><RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh</Button>
       </header>
 
-      <section className="overflow-hidden rounded-lg border border-default bg-studio">
-        <div className="flex flex-col gap-4 border-b border-default bg-dash-sidebar p-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-2 text-xs font-medium text-foreground-lighter"><Shield className="h-4 w-4" /> Table policies</div>
-            <div className="relative flex min-w-0 items-center sm:w-48">
-              <Input aria-label="Search tables" placeholder="Filter tables…" iconLeft={<Search aria-hidden="true" className="h-3.5 w-3.5" />} value={search} onChange={event => setSearch(event.target.value)} className="h-8 w-full bg-studio text-xs" />
-            </div>
-            {selection}
-          </div>
-          {current && !current.enabled
-            ? <Button variant="primary" size="small" onClick={() => setConfirmation({ kind: 'enable' })} disabled={loading}><Shield className="mr-1.5 h-3.5 w-3.5" /> Enable RLS</Button>
-            : <Button variant="primary" size="small" onClick={openCreate} disabled={!current || loading}><Plus className="mr-1.5 h-3.5 w-3.5" /> Add RLS policy</Button>}
-        </div>
+      <div className="mb-3">
+        {selection}
+      </div>
 
-        <div className="flex flex-col gap-3 border-b border-default bg-studio p-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-3">
-            <div className={`mt-0.5 rounded-md border p-2 ${current?.enabled ? 'border-brand/25 bg-brand/10 text-brand' : 'border-default bg-surface-100 text-foreground-lighter'}`}>
-              {current?.enabled ? <TableIcon className="h-4 w-4" /> : <ShieldOff className="h-4 w-4" />}
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
-                {current ? <code className="font-mono">{current.schema}.{current.name}</code> : loading ? 'Loading tables…' : 'No table selected'}
-                {current?.forced && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-500">Forced</span>}
-              </div>
-              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-foreground-lighter">
-                {current?.enabled
-                  ? 'Row access is governed by table privileges and applicable policies. Table owners bypass RLS unless FORCE is enabled.'
-                  : current ? 'Policies are stored even while RLS is disabled. Enabling RLS without applicable policies denies normal clients access to rows.'
-                  : 'Select a table to view and manage its policies.'}
-              </p>
+      <section className={`overflow-hidden rounded-lg border ${current && !current.enabled ? 'border-amber-500/40 bg-amber-500/[0.025]' : 'border-default bg-studio'}`}>
+        <div className={`flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between ${current && !current.enabled ? 'border-amber-500/25' : 'border-default'}`}>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <TableIcon className={`h-4 w-4 shrink-0 ${current && !current.enabled ? 'text-amber-600 dark:text-amber-400' : 'text-foreground-lighter'}`} />
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <code className="truncate font-mono text-sm font-medium text-foreground">{current ? `${current.schema}.${current.name}` : loading ? 'Loading tables…' : 'No table selected'}</code>
+              {current && !current.enabled && <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">RLS disabled</span>}
+              {current?.forced && <span className="rounded-full bg-surface-200 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-foreground-lighter">Force on</span>}
             </div>
           </div>
-          {current && <div className="flex shrink-0 flex-wrap gap-2">
-            {current.enabled && <Button variant="default" size="small" onClick={() => setConfirmation({ kind: 'disable' })}>Disable RLS</Button>}
-            <Button variant="default" size="small" onClick={() => setConfirmation({ kind: current.forced ? 'unforce' : 'force' })}>
-              {current.forced ? 'Remove FORCE' : 'Force RLS'}
-            </Button>
-          </div>}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {current && (current.enabled
+              ? <Button variant="default" size="small" onClick={() => setConfirmation({ kind: 'disable' })} disabled={loading}>Disable RLS</Button>
+              : <Button variant="primary" size="small" onClick={() => setConfirmation({ kind: 'enable' })} disabled={loading}><Shield className="mr-1.5 h-3.5 w-3.5" /> Enable RLS</Button>)}
+            <Button variant="default" size="small" onClick={openCreate} disabled={!current || loading}><Plus className="mr-1.5 h-3.5 w-3.5" /> Create policy</Button>
+            {current && <Button variant="ghost" size="small" aria-label={current.forced ? 'Remove FORCE' : 'Force RLS'} title={current.forced ? 'Remove FORCE' : 'Force RLS'} onClick={() => setConfirmation({ kind: current.forced ? 'unforce' : 'force' })} disabled={loading}>
+              {current.forced ? <ShieldOff className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
+            </Button>}
+          </div>
         </div>
 
-        {current && !current.enabled && <div className="flex items-start gap-2 border-b border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-600 dark:text-amber-400">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <p><strong>RLS is off.</strong> These policies do not currently filter rows. Enabling RLS without policies denies normal clients; RLS does not grant table privileges. Superusers and BYPASSRLS roles always bypass.</p>
-        </div>}
-        {current?.enabled && <div className="flex items-start gap-2 border-b border-default bg-surface-100/60 px-4 py-2.5 text-[11px] text-foreground-lighter">
-          <CircleHelp className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Table privileges remain separate from row policies. Superusers and BYPASSRLS roles always bypass RLS; owners bypass unless FORCE is enabled.
+        {current && (!current.enabled || current.policies.length === 0) && <div className={`border-b px-4 py-3 text-xs ${!current.enabled ? 'border-amber-500/20 text-amber-700 dark:text-amber-400' : 'border-default text-foreground-lighter'}`}>
+          {!current.enabled ? 'RLS is disabled. Row access follows database privileges.' : 'No applicable RLS policies exist on this table.'}
         </div>}
 
         {(error || operationError) && <div role="alert" className="m-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-red-400">
@@ -241,10 +263,6 @@ export function PoliciesPageView() {
           <p className="text-sm font-medium text-foreground">{catalog?.tables.length ? 'No tables match this search' : 'No tables in this database'}</p>
           <p className="mt-1 text-xs text-foreground-lighter">{catalog?.tables.length ? 'Try a different schema or table name.' : 'Create a table before configuring row security.'}</p>
         </div> : <div>
-          <div className="flex items-center justify-between border-b border-default px-4 py-3">
-            <div><h2 className="text-xs font-medium text-foreground">Policies</h2><p className="mt-0.5 text-[11px] text-foreground-lighter">{current.policies.length} defined · active only while RLS is enabled</p></div>
-            <span className="text-[10px] font-mono text-foreground-lighter">{current.schema}.{current.name}</span>
-          </div>
           {current.policies.length ? <div className="divide-y divide-default">
             {current.policies.map(policy => <article key={policy.name} className="group grid gap-3 px-4 py-4 transition-colors hover:bg-surface-100/60 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_auto] md:items-center">
               <div className="min-w-0">
@@ -267,13 +285,8 @@ export function PoliciesPageView() {
                 <Button variant="ghost" size="small" aria-label={`Delete policy ${policy.name}`} title="Delete policy" className="text-foreground-lighter hover:text-red-400" onClick={() => setConfirmation({ kind: 'delete', policyName: policy.name })}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </article>)}
-          </div> : <div className="px-5 py-10 text-center">
-            <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full border border-default bg-surface-100 text-foreground-lighter"><LockKeyhole className="h-4 w-4" /></div>
-            <p className="text-sm font-medium text-foreground">No policies defined</p>
-            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground-lighter">{current.enabled ? 'No applicable policies means normal clients cannot access rows in this table.' : 'You can define policies before enabling RLS. They take effect when row level security is enabled.'}</p>
-            {current.enabled
-              ? <Button variant="default" size="small" className="mt-4" onClick={openCreate}><Plus className="mr-1.5 h-3.5 w-3.5" /> Create first policy</Button>
-              : <Button variant="primary" size="small" className="mt-4" onClick={() => setConfirmation({ kind: 'enable' })}><Shield className="mr-1.5 h-3.5 w-3.5" /> Enable RLS</Button>}
+          </div> : <div className="px-4 py-5 text-left">
+            <p className="text-sm text-foreground-lighter">No policies created yet</p>
           </div>}
         </div>}
       </section>
