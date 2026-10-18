@@ -8,6 +8,7 @@ import { TableService } from './tables/tables.service.js';
 import { SchemaService } from './visualizer/visualizer.service.js';
 import { AuthService } from './auth/auth.service.js';
 import { MetricsService } from './metrics/metrics.service.js';
+import { ServiceStatusService } from './metrics/service-status.js';
 import { ConnectionService } from './connection/connection.service.js';
 import { ClientRolesService } from './connection/client-roles.service.js';
 import { PoolerService } from './connection/pooler.service.js';
@@ -24,6 +25,7 @@ export function createServices(config: Config) {
   const metrics = new MetricsService(config, catalog, postgres);
   return {
     catalog, postgres, branches, tables, metrics, clientRoles,
+    serviceStatus: new ServiceStatusService(config, catalog, pooler),
     connection: new ConnectionService(config, catalog, clientRoles),
     policies: new PoliciesService(config, catalog),
     pooler, maintenance: new DatabaseMaintenanceService(config, catalog, branches, pooler),

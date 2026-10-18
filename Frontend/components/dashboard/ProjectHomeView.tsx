@@ -30,6 +30,54 @@ function MetricCard({ title, value, badges, loading = false }: { title: string; 
   )
 }
 
+type ServiceStatus = {
+  active: boolean | null
+  error: string | null
+}
+
+type ServiceStatuses = {
+  postgres: ServiceStatus
+  rls: ServiceStatus
+  pgbouncer: ServiceStatus
+}
+
+const unavailableStatuses: ServiceStatuses = {
+  postgres: { active: null, error: null },
+  rls: { active: null, error: null },
+  pgbouncer: { active: null, error: null },
+}
+
+function ServiceStatusItem({ name, status, loading, description }: {
+  name: string
+  status: ServiceStatus
+  loading: boolean
+  description?: string
+}) {
+  const label = status.active === true ? 'Active' : status.active === false ? 'Inactive' : 'Unavailable'
+  const accessibleLabel = loading ? 'Loading status' : label
+  const detail = [description, status.error].filter(Boolean).join(' ')
+  const dotClass = loading || status.active == null
+    ? 'bg-foreground-muted'
+    : status.active
+      ? 'bg-emerald-500'
+      : 'bg-rose-500'
+
+  return (
+    <span
+      title={detail || undefined}
+      aria-label={`${name}: ${accessibleLabel}${detail ? `. ${detail}` : ''}`}
+      className="inline-flex items-center gap-2 text-sm text-foreground-light"
+    >
+      {loading
+        ? <Spinner size={12} decorative />
+        : <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />}
+      <span>{name}</span>
+      {!loading && <span className="text-foreground-muted">{label}</span>}
+      {detail && <span className="sr-only">{detail}</span>}
+    </span>
+  )
+}
+
 export function ProjectHomeView() {
   const { database, branch, branches, settings } = useStudio()
   const projectName = settings?.projectName || 'Sorabase'
@@ -39,6 +87,9 @@ export function ProjectHomeView() {
   const [error, setError] = useState('')
   const [refreshToken, setRefreshToken] = useState(0)
   const [now, setNow] = useState(0)
+  const [serviceStatuses, setServiceStatuses] = useState<ServiceStatuses>(unavailableStatuses)
+  const [serviceStatusLoading, setServiceStatusLoading] = useState(true)
+  const [serviceStatusError, setServiceStatusError] = useState('')
   const requestId = useRef(0)
   const key = database
 
@@ -90,6 +141,73 @@ export function ProjectHomeView() {
       document.removeEventListener('visibilitychange', schedule)
     }
   }, [database, key, refreshToken])
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined
+    let activeController: AbortController | null = null
+    let request = 0
+    let mounted = true
+
+    const refreshStatus = async () => {
+      if (document.visibilityState !== 'visible' || !mounted) return
+      activeController?.abort()
+      const controller = new AbortController()
+      activeController = controller
+      const id = ++request
+      try {
+        const result = await api<{
+          database: string
+          checkedAt: string
+          postgres: ServiceStatus
+          rls: ServiceStatus
+          pgbouncer: ServiceStatus
+        }>(`/databases/${encodeURIComponent(database)}/metrics/status`, { signal: controller.signal })
+        if (mounted && !controller.signal.aborted && id === request) {
+          setServiceStatuses({
+            postgres: result.postgres,
+            rls: result.rls,
+            pgbouncer: result.pgbouncer,
+          })
+          setServiceStatusError('')
+        }
+      } catch (cause) {
+        if (mounted && !controller.signal.aborted && id === request) {
+          setServiceStatuses(unavailableStatuses)
+          setServiceStatusError(errorMessage(cause))
+        }
+      } finally {
+        if (mounted && !controller.signal.aborted && id === request) {
+          setServiceStatusLoading(false)
+          activeController = null
+        }
+      }
+    }
+
+    const schedule = () => {
+      if (timer) clearInterval(timer)
+      if (document.visibilityState === 'visible') {
+        void refreshStatus()
+        timer = setInterval(() => void refreshStatus(), 30_000)
+      } else {
+        request += 1
+        activeController?.abort()
+        activeController = null
+      }
+    }
+
+    setServiceStatuses(unavailableStatuses)
+    setServiceStatusError('')
+    setServiceStatusLoading(true)
+    schedule()
+    document.addEventListener('visibilitychange', schedule)
+    return () => {
+      mounted = false
+      request += 1
+      activeController?.abort()
+      if (timer) clearInterval(timer)
+      document.removeEventListener('visibilitychange', schedule)
+    }
+  }, [database, refreshToken])
 
   const current = metricsKey === key ? metrics : null
   const metricsLoading = loading || !current
@@ -175,11 +293,25 @@ export function ProjectHomeView() {
 
       <SyncActivityChart activity={current?.activity ?? null} loading={metricsLoading} />
 
-      {/* Unsupported service cards remain unchanged rather than implying telemetry exists. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <MetricCard title="PostgreSQL Engine" value="—" badges={['Version not exposed']} />
-        <MetricCard title="Row Level Security" value="—" badges={['Status not exposed', 'Policies not exposed']} />
-        <MetricCard title="PgBouncer" value="—" badges={['Pooler metrics not exposed']} />
+      <div role="group" aria-label="Service health" className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <ServiceStatusItem name="PostgreSQL Engine" status={serviceStatuses.postgres} loading={serviceStatusLoading} />
+        <ServiceStatusItem
+          name="Row Level Security"
+          status={serviceStatuses.rls}
+          loading={serviceStatusLoading}
+          description="Active means at least one user table in the selected database has RLS enabled."
+        />
+        <ServiceStatusItem name="PgBouncer" status={serviceStatuses.pgbouncer} loading={serviceStatusLoading} />
+        {serviceStatusError && (
+          <span
+            role="alert"
+            title={serviceStatusError}
+            className="text-xs text-rose-500"
+          >
+            Status check failed
+            <span className="sr-only">: {serviceStatusError}</span>
+          </span>
+        )}
       </div>
       {latest && <p className="text-xs text-foreground-muted">Latest persisted reading: {formatTimestamp(latest.sampledAt)}. CPU and RAM are shared across the Postgres container, not per branch or VPS totals.</p>}
     </div>

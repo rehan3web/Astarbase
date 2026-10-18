@@ -32,6 +32,15 @@ export class PoolerService {
     await this.catalog.assertDatabase(database);
     if (database !== this.config.DB_NAME) throw new HttpError(403, 'Pool configuration is available only on main');
   }
+  async checkHealth(): Promise<void> {
+    await this.execute(`import {spawnSync} from 'node:child_process';
+      const result=spawnSync('psql',['-X','--no-password','--host','/tmp','--port','6432',
+        '--username',process.env.DB_USER,'--dbname','pgbouncer','--tuples-only',
+        '--no-align','--set','ON_ERROR_STOP=1','--command','SHOW VERSION'],
+        {env:{...process.env,PGPASSWORD:process.env.DB_PASSWORD},encoding:'utf8',timeout:5000,maxBuffer:65536});
+      if(result.error || result.status!==0 || !result.stdout.includes('PgBouncer')) process.exit(1);
+    `);
+  }
   async get(database: string) {
     await this.assertMain(database);
     const { output } = await this.execute(`import {readFile} from 'node:fs/promises';

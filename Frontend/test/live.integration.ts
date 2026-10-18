@@ -20,6 +20,7 @@ import { verifyForeignKeyPanel } from './foreign-key-panel.browser'
 import { verifyTableFooter } from './table-footer.browser'
 import { verifyLoadingStates } from './loading-states.browser'
 import { verifyTableDefinition } from './table-definition.browser'
+import { verifyServiceStatus } from './service-status.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
 import { verifyStorageAndBackups } from './backups.browser'
@@ -145,6 +146,11 @@ try {
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
   await page.getByLabel('Password', { exact: true }).fill(loginPassword)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  if (process.env.STUDIO_SERVICE_STATUS_ONLY === '1') {
+    await verifyServiceStatus(page, url, config, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
   await expect(page.getByRole('button', { name: 'Active branch', exact: true })).toBeVisible()
   await snapshot('home')
   await expect(page).toHaveTitle('Sorabase Studio')
