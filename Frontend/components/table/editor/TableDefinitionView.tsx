@@ -1,8 +1,8 @@
 'use client'
 
 import React from 'react'
-import { Key } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { PrimaryKeyIcon } from '@/components/ui/primary-key-icon'
 import { TableDefinition } from '@/lib/mock-data'
 
 interface TableDefinitionViewProps {
@@ -37,7 +37,7 @@ export function TableDefinitionView({ selectedTable }: TableDefinitionViewProps)
               {selectedTable.columns.map((c) => (
                 <tr key={c.id} className="hover:bg-surface-200/50 transition-colors">
                   <td className="px-4 py-3 font-semibold text-foreground flex items-center gap-2">
-                    {c.isPrimaryKey && <Key className="h-3.5 w-3.5 text-brand-500" />}
+                    {c.isPrimaryKey && <PrimaryKeyIcon className="h-3.5 w-3.5 text-brand-500" />}
                     <span>{c.name}</span>
                   </td>
                   <td className="px-4 py-3 text-brand-400">{c.dataType}</td>

@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { Plus, Trash2, X, Key } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import { TableDefinition, ColumnDefinition } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
+import { PrimaryKeyIcon } from '@/components/ui/primary-key-icon'
 import {
   Select,
   SelectContent,
@@ -328,7 +329,7 @@ export function InsertTableModal({
                   >
                     <div className="flex items-center justify-between border-b border-default pb-2">
                       <span className="text-xs font-medium text-foreground flex items-center gap-1.5 font-mono">
-                        {col.isPrimaryKey && <Key className="h-3 w-3 text-amber-400" />}
+                        {col.isPrimaryKey && <PrimaryKeyIcon className="h-3 w-3 text-amber-400" />}
                         <span>{col.name || `Column ${idx + 1}`}</span>
                       </span>
                       {columns.length > 1 && (

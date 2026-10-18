@@ -2,24 +2,45 @@ import assert from 'node:assert/strict'
 import { expect, type Locator, type Page } from '@playwright/test'
 
 export async function verifyPrimaryKeyIcons(page: Page, url: string, snapshot: (name: string) => Promise<unknown>) {
-  const verifyKey = async (icon: Locator) => {
+  const verifyKey = async (icon: Locator, size = 14, scaled = false, labeled = false) => {
     await expect(icon).toBeVisible()
     for (const [name, value] of Object.entries({
       width: '14', height: '14', viewBox: '0 0 24 24', fill: 'none',
-      stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round',
-      'stroke-linejoin': 'round', 'aria-hidden': 'true',
+      stroke: 'currentColor', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
     })) await expect(icon).toHaveAttribute(name, value)
+    if (labeled) {
+      await expect(icon).toHaveAttribute('role', 'img')
+      await expect(icon).not.toHaveAttribute('aria-hidden', 'true')
+    } else {
+      await expect(icon).toHaveAttribute('aria-hidden', 'true')
+      await expect(icon).toHaveAttribute('stroke-width', '2')
+    }
     assert.deepEqual(await icon.locator('path').evaluateAll(paths => paths.map(path => path.getAttribute('d'))), [
-      'm2 21 9.6-9.6',
-      'm7.5 15.5 2.3 2.3a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0L4 19',
+      'M12 12h10m-4 0v4m4-4v4',
     ])
-    await expect(icon.locator('circle')).toHaveAttribute('cx', '15.5')
-    await expect(icon.locator('circle')).toHaveAttribute('cy', '7.5')
-    await expect(icon.locator('circle')).toHaveAttribute('r', '5.5')
+    await expect(icon.locator('circle')).toHaveAttribute('cx', '7')
+    await expect(icon.locator('circle')).toHaveAttribute('cy', '12')
+    await expect(icon.locator('circle')).toHaveAttribute('r', '5')
+    await expect(icon).toHaveCSS('transform', 'none')
+    const points = await icon.evaluate(element => {
+      const svg = element as SVGSVGElement
+      const matrix = svg.getScreenCTM()!
+      const path = svg.querySelector('path')!
+      const projected = [new DOMPoint(7, 12), path.getPointAtLength(0), path.getPointAtLength(10)].map(point => {
+        const result = point.matrixTransform(matrix)
+        return { x: result.x, y: result.y }
+      })
+      return { head: projected[0], start: projected[1], end: projected[2] }
+    })
+    assert.ok(points.head.x < points.start.x && points.start.x < points.end.x)
+    assert.ok(Math.abs(points.head.y - points.start.y) < 0.1)
+    assert.ok(Math.abs(points.start.y - points.end.y) < 0.1)
     const bounds = await icon.boundingBox()
     assert.ok(bounds)
-    assert.equal(bounds.width, 14)
-    assert.equal(bounds.height, 14)
+    if (!scaled) {
+      assert.equal(bounds.width, size)
+      assert.equal(bounds.height, size)
+    }
   }
 
   await page.goto(`${url}/tables`)
@@ -32,7 +53,7 @@ export async function verifyPrimaryKeyIcons(page: Page, url: string, snapshot: (
   assert.equal(logoBounds.width, 22)
   assert.equal(logoBounds.height, 22)
 
-  const selector = 'svg:has(circle[cx="15.5"][cy="7.5"])'
+  const selector = 'svg[data-primary-key-icon]'
   await verifyKey(page.locator('th').locator(selector))
   await snapshot('table-primary-key-icon')
   await page.getByRole('button', { name: 'Insert', exact: true }).click()
@@ -40,5 +61,14 @@ export async function verifyPrimaryKeyIcons(page: Page, url: string, snapshot: (
   await verifyKey(page.getByRole('dialog').locator(selector))
   await snapshot('insert-primary-key-icon')
   await page.keyboard.press('Escape')
-  console.log('PASS: compact 22px header logo and exact 14px primary-key SVG in table headers and Insert form')
+  await page.locator('[data-table-footer]').getByRole('tab', { name: 'Definition', exact: true }).click()
+  await verifyKey(page.locator(selector))
+  await page.getByRole('button', { name: 'New table', exact: true }).first().click()
+  await verifyKey(page.getByRole('dialog').locator(selector), 12)
+  await page.keyboard.press('Escape')
+  await page.goto(`${url}/visualizer`)
+  await expect(page.getByRole('img', { name: 'Primary key', exact: true }).first()).toBeVisible()
+  for (const icon of await page.getByRole('img', { name: 'Primary key', exact: true }).all()) await verifyKey(icon, 14, true, true)
+  await snapshot('horizontal-primary-keys-diagram')
+  console.log('PASS: compact header logo and shared horizontal primary-key icons, head left and teeth right, in table, Insert row, Definition, Insert table and visualizer')
 }

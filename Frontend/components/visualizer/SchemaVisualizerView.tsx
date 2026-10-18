@@ -27,13 +27,13 @@ import {
   Download,
   Fingerprint,
   Hash,
-  Key,
   Link as LinkIcon,
   MoreVertical,
   Search,
   Table2 as TableIcon,
 } from 'lucide-react'
 import { SchemaSelector } from '@/components/ui/schema-selector'
+import { PrimaryKeyIcon } from '@/components/ui/primary-key-icon'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import {
   DropdownMenu,
@@ -102,7 +102,7 @@ function TableNode({ data }: NodeProps<FlowTableNode>) {
               />
               <div className="flex items-center gap-3 truncate">
                 <div className="flex items-center gap-1.5 shrink-0 text-foreground-light">
-                  {isPrimaryKey && <Key className="h-3.5 w-3.5 -rotate-45" strokeWidth={1.5} aria-label="Primary key" />}
+                  {isPrimaryKey && <PrimaryKeyIcon className="h-3.5 w-3.5" strokeWidth={1.5} aria-label="Primary key" />}
                   {isForeignKey && <LinkIcon className="h-3.5 w-3.5" strokeWidth={1.5} aria-label="Foreign key" />}
                   <Diamond className={cn('h-3.5 w-3.5', !column.nullable && 'fill-current')} strokeWidth={1.5} aria-label={column.nullable ? 'Nullable' : 'Not null'} />
                   {isIdentity && <Hash className="h-3.5 w-3.5" strokeWidth={1.5} aria-label="Identity" />}
