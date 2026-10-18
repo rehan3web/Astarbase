@@ -62,7 +62,7 @@ export async function verifyPrimaryKeyIcons(page: Page, url: string, snapshot: (
   await snapshot('insert-primary-key-icon')
   await page.keyboard.press('Escape')
   await page.locator('[data-table-footer]').getByRole('tab', { name: 'Definition', exact: true }).click()
-  await verifyKey(page.locator(selector))
+  await expect(page.getByRole('textbox', { name: 'SQL definition', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'New table', exact: true }).first().click()
   await verifyKey(page.getByRole('dialog').locator(selector), 12)
   await page.keyboard.press('Escape')
@@ -70,5 +70,5 @@ export async function verifyPrimaryKeyIcons(page: Page, url: string, snapshot: (
   await expect(page.getByRole('img', { name: 'Primary key', exact: true }).first()).toBeVisible()
   for (const icon of await page.getByRole('img', { name: 'Primary key', exact: true }).all()) await verifyKey(icon, 14, true, true)
   await snapshot('horizontal-primary-keys-diagram')
-  console.log('PASS: compact header logo and shared horizontal primary-key icons, head left and teeth right, in table, Insert row, Definition, Insert table and visualizer')
+  console.log('PASS: compact header logo and horizontal primary-key icons in table, Insert row, Insert table and visualizer; read-only SQL Definition view')
 }

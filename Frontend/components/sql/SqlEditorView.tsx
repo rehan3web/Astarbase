@@ -13,6 +13,7 @@ import { useStudio } from '@/components/providers/StudioProvider'
 import { parseSqlExecutionOutput } from '@/lib/sql-results'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import { Spinner } from '@/components/ui/spinner'
+import { takeSqlEditorDraft } from '@/lib/sql-editor-handoff'
 
 type SqlLibrary = { folders: SqlFolder[]; snippets: SqlSnippet[] }
 type Visibility = 'private' | 'shared'
@@ -141,6 +142,22 @@ export function SqlEditorView() {
       })
     return () => controller.abort()
   }, [notify, setSnippetsSnapshot, setActiveSnippetSnapshot, setCurrentSqlSnapshot])
+
+  useEffect(() => {
+    if (isLoading) return
+    try {
+      const handoff = takeSqlEditorDraft(database)
+      if (!handoff) return
+      const draft = { ...makeScratch(), id: `scratch-definition-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: handoff.name }
+      setSnippetsSnapshot([...snippetsRef.current, draft])
+      setDraftSqlSnapshot({ ...draftSqlMapRef.current, [draft.id]: handoff.sql })
+      setActiveSnippetSnapshot(draft.id)
+      setCurrentSqlSnapshot(handoff.sql)
+      setOpenTabIds(previous => [...previous, draft.id])
+    } catch (error) {
+      notify(errorMessage(error), 'error')
+    }
+  }, [database, isLoading, notify, setSnippetsSnapshot, setDraftSqlSnapshot, setActiveSnippetSnapshot, setCurrentSqlSnapshot])
 
   const unsavedSnippetIds = useMemo(() => {
     const unsaved = new Set<string>()

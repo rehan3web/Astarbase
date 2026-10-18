@@ -13,6 +13,7 @@ export function tablesRoutes(services: Services) {
   const controller = tablesController(services);
   router.use(managedDatabase(services));
   router.get('/', controller.list);
+  router.get('/:schema/:table/definition', controller.definition);
   router.get('/:schema/:table/rows', controller.rows);
   router.post('/:schema/:table/rows', controller.insert);
   router.patch('/:schema/:table/rows', controller.update);

@@ -19,6 +19,7 @@ import { verifyPrimaryKeyIcons } from './primary-key-icons.browser'
 import { verifyForeignKeyPanel } from './foreign-key-panel.browser'
 import { verifyTableFooter } from './table-footer.browser'
 import { verifyLoadingStates } from './loading-states.browser'
+import { verifyTableDefinition } from './table-definition.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
 import { verifyStorageAndBackups } from './backups.browser'
@@ -184,6 +185,12 @@ try {
   })
   assert.equal(csrf.status(), 403)
   if (process.env.STUDIO_AUTH_ONLY === '1') {
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  if (process.env.STUDIO_DEFINITION_ONLY === '1') {
+    await verifyTableDefinition(page, url, config, services, snapshot)
     assert.deepEqual(browserErrors, [])
     return
   }

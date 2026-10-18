@@ -7,6 +7,13 @@ export function tablesController(services: Services) {
   return {
     async databases(_req: Request, res: Response) { res.json(await services.catalog.branches()); },
     async list(req: Request, res: Response) { res.json(await services.tables.list(database(req))); },
+    async definition(req: Request, res: Response) {
+      const { schema, table } = tableParams(req);
+      const db = database(req);
+      // Check a literal table identity before pg_dump pattern selection.
+      await services.tables.db(db, client => services.tables.info(client, schema, table));
+      res.json(await services.postgres.tableDefinition(db, schema, table));
+    },
     async rows(req: Request, res: Response) {
       const { schema, table } = tableParams(req);
       const { limit, offset } = z.object({

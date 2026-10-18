@@ -2,15 +2,18 @@ import type { Config } from '../../config.js';
 import { HttpError } from '../../errors.js';
 import { DockerService } from './docker.js';
 import type { Writable } from 'node:stream';
+import { quoteIdentifier } from '../../db/socket.js';
+import { readableTableDefinition } from '../tables/table-definition.js';
 
 export class PostgresContainer {
   constructor(readonly config: Config, readonly docker = new DockerService(config)) {}
 
-  async schemaSql(database: string) {
+  async schemaSql(database: string, relation?: { schema: string; table: string }) {
     const { stdout } = await this.docker.exec([
       'pg_dump', '--host', this.config.PG_SOCKET_DIR, '--username', this.config.DB_USER,
       '--no-password', '--schema-only', '--no-owner', '--no-privileges',
       '--no-publications', '--no-subscriptions', '--dbname', database,
+      ...(relation ? ['--strict-names', '--table', `${quoteIdentifier(relation.schema)}.${quoteIdentifier(relation.table)}`] : []),
     ], 3600000, 64 * 1024 * 1024);
     // Recent pg_dump versions surround scripts with psql-only restriction
     // directives. Remove only the matching outer pair, not SQL/function bodies.
@@ -25,6 +28,11 @@ export class PostgresContainer {
       lines[first] = ''; lines[last] = '';
     }
     return { database, sql: lines.join('\n') };
+  }
+
+  async tableDefinition(database: string, schema: string, table: string) {
+    const result = await this.schemaSql(database, { schema, table });
+    return { database, schema, table, sql: readableTableDefinition(result.sql) };
   }
 
   async query(database: string, sql: string) {
