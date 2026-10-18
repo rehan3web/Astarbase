@@ -33,7 +33,7 @@ export function AppHeader({ title }: { title?: string }) {
           title="Sorabase Studio"
           aria-label="Sorabase Studio"
         >
-          <SorabaseLogo size={26} />
+          <SorabaseLogo size={22} />
         </Link>
         <span className="text-foreground-muted/60 mx-1 font-light">/</span>
 

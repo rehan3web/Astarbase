@@ -12,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import type { ForeignKeyDraft } from '@/lib/foreign-keys'
+import { ForeignKeyPanel } from './ForeignKeyPanel'
 
 interface InsertColumnModalProps {
   open: boolean
@@ -25,6 +27,7 @@ interface InsertColumnModalProps {
     isArray?: boolean
     isPrimaryKey?: boolean
     isNullable?: boolean
+    foreignKey?: ForeignKeyDraft | null
   }
   onNewColumnDataChange: (data: any) => void
   onInsert: (keepOpen?: boolean) => void
@@ -43,6 +46,7 @@ export function InsertColumnModal({
 }: InsertColumnModalProps) {
   const isEdit = mode === 'edit'
   const [createMore, setCreateMore] = useState(false)
+  const [foreignKeyOpen, setForeignKeyOpen] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Focus name input on open
@@ -53,11 +57,17 @@ export function InsertColumnModal({
   }, [open])
 
   const handleSave = useCallback(() => {
+    if (foreignKeyOpen) return
     if (!newColumnData.name.trim()) return
     const keepOpen = createMore && !isEdit
     onInsert(keepOpen)
 
-  }, [createMore, isEdit, newColumnData.name, onInsert])
+  }, [createMore, foreignKeyOpen, isEdit, newColumnData.name, onInsert])
+
+  const handleParentOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setForeignKeyOpen(false)
+    onOpenChange(nextOpen)
+  }
 
   // Keyboard shortcut Ctrl+Enter to save
   useEffect(() => {
@@ -74,7 +84,7 @@ export function InsertColumnModal({
   }, [open, handleSave])
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={handleParentOpenChange}>
       <DialogPrimitive.Portal>
         {/* Dimmed backdrop overlay */}
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
@@ -256,11 +266,33 @@ export function InsertColumnModal({
               <div className="col-span-8">
                 <button
                   type="button"
-                  onClick={() => alert('Foreign key configuration modal')}
+                  onClick={() => setForeignKeyOpen(true)}
                   className="px-3 py-1.5 rounded-md border border-strong bg-surface-200 hover:bg-surface-300 text-foreground text-xs font-medium transition-colors cursor-pointer"
                 >
-                  Add foreign key
+                  {newColumnData.foreignKey ? 'Edit foreign key' : 'Add foreign key'}
                 </button>
+                {newColumnData.foreignKey && (
+                  <div className="mt-3 rounded-md border border-default bg-surface-200/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-medium text-foreground-lighter">References</p>
+                        <p className="mt-1 break-all font-mono text-xs text-foreground">
+                          {newColumnData.foreignKey.targetSchema}.{newColumnData.foreignKey.targetTable}.{newColumnData.foreignKey.targetColumn}
+                        </p>
+                        <p className="mt-1 text-[10px] text-foreground-lighter">
+                          Applied when you save the column
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onNewColumnDataChange({ ...newColumnData, foreignKey: null })}
+                        className="shrink-0 rounded px-2 py-1 text-[11px] text-foreground-lighter hover:bg-surface-300 hover:text-foreground"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -388,6 +420,18 @@ export function InsertColumnModal({
               </button>
             </div>
           </div>
+          <ForeignKeyPanel
+            open={open && foreignKeyOpen}
+            onOpenChange={setForeignKeyOpen}
+            tableName={selectedTable.name}
+            sourceColumn={newColumnData.name}
+            sourceType={newColumnData.type}
+            initialDraft={newColumnData.foreignKey ?? null}
+            onSave={(draft) => {
+              onNewColumnDataChange({ ...newColumnData, foreignKey: draft })
+              setForeignKeyOpen(false)
+            }}
+          />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

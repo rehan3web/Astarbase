@@ -1,10 +1,36 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { formatBytes } from '../lib/dashboard-metrics'
 
 export async function verifyStorageAndBackups(page: Page, url: string, removeArchive: (id: string) => Promise<void>) {
+  const palette = (header: Locator) => header.evaluate(element => {
+    const root = document.documentElement
+    const original = root.className
+    const originalAttribute = root.getAttribute('data-theme')
+    try {
+      return ['light', 'dark'].map(theme => {
+        root.classList.toggle('dark', theme === 'dark')
+        root.setAttribute('data-theme', theme)
+        const container = element.parentElement!
+        const headerStyle = getComputedStyle(element)
+        const containerStyle = getComputedStyle(container)
+        return {
+          theme,
+          background: containerStyle.backgroundColor,
+          border: containerStyle.borderColor,
+          headerBackground: headerStyle.backgroundColor,
+          headerBorder: headerStyle.borderBottomColor,
+        }
+      })
+    } finally {
+      root.className = original
+      if (originalAttribute === null) root.removeAttribute('data-theme')
+      else root.setAttribute('data-theme', originalAttribute)
+    }
+  })
   await page.goto(`${url}/branches`)
+  const branchPalette = await palette(page.getByText('Branch name', { exact: true }).locator('..'))
   const branchResponse = await page.request.get(`${url}/api/studio/branches`)
   assert.equal(branchResponse.status(), 200)
   const branches: { name: string; storage_bytes: number }[] = await branchResponse.json()
@@ -14,6 +40,12 @@ export async function verifyStorageAndBackups(page: Page, url: string, removeArc
     await expect(page.locator(`[data-branch-storage="${branch.name}"]`)).toHaveText(formatBytes(branch.storage_bytes))
   }
   await page.goto(`${url}/settings/backups`)
+  await expect(page.getByRole('heading', { name: 'Database Backups' })).toBeVisible()
+  assert.deepEqual(
+    await palette(page.getByText('Backup name', { exact: true }).locator('..')),
+    branchPalette,
+    'Backup list backgrounds, headers and borders must match Branches in light and dark mode',
+  )
   const list = async (): Promise<{ id: string; label: string; available: boolean }[]> => {
     const response = await page.request.get(`${url}/api/studio/backups`)
     assert.equal(response.status(), 200)

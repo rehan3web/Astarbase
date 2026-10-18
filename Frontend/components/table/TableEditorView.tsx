@@ -9,6 +9,7 @@ import { useNotifications } from '@/components/providers/NotificationProvider'
 import { TableExplorer, TableAction } from './explorer/TableExplorer'
 import { TableToolbar } from './editor/TableToolbar'
 import { TableDataGrid, ColumnAction } from './editor/TableDataGrid'
+import { TableFooter } from './editor/TableFooter'
 import { TableDefinitionView } from './editor/TableDefinitionView'
 import { InsertTableModal } from './insert/InsertTableModal'
 import { InsertRowModal } from './insert/InsertRowModal'
@@ -22,9 +23,10 @@ import { TableTabBar } from './tabs/TableTabBar'
 import { TableNewTabView } from './tabs/TableNewTabView'
 import { NEW_TAB_ID } from './tabs/TableTabBar'
 import type { RecentTableItem } from './tabs/TableNewTabView'
+import { foreignKeyReferenceSql, type ForeignKeyDraft } from '@/lib/foreign-keys'
 
 type Summary = { schema: string; name: string; estimated_rows: string; rls_enabled?: boolean }
-type ColumnValues = { name: string; type: string; defaultValue: string; isNullable: boolean; isArray?: boolean; isPrimaryKey?: boolean; description?: string }
+type ColumnValues = { name: string; type: string; defaultValue: string; isNullable: boolean; isArray?: boolean; isPrimaryKey?: boolean; description?: string; foreignKey?: ForeignKeyDraft | null }
 const blankColumn: ColumnValues = { name: '', type: 'text', defaultValue: '', isNullable: true, isPrimaryKey: false }
 export function TableEditorView() {
   const router = useRouter()
@@ -75,6 +77,7 @@ export function TableEditorView() {
   useEffect(() => {
     const controller = new AbortController()
     version.current++
+    setInsertColumn(false); setColumnValues(blankColumn); setEditingColumn(null)
     setSelected(null); setData(null); setOffset(0); setError(''); setTables([]); setFrozenColumns(new Set())
     loadTables(controller.signal).then(list => { if (!controller.signal.aborted && list[0]) { setSelected(list[0]); setSchema(list[0].schema); const id = JSON.stringify([list[0].schema, list[0].name]); setOpenTabs([id]); setActiveTab(id); setRecentItems([{ tableId: id, openedAt: Date.now() }]) } })
       .catch(e => { if (!controller.signal.aborted) setError(errorMessage(e)) })
@@ -92,6 +95,11 @@ export function TableEditorView() {
     return false
   }, [database, selected, offset, limit])
   useEffect(() => { const controller = new AbortController(); void loadRows(controller.signal); return () => controller.abort() }, [loadRows])
+  useEffect(() => {
+    if (data && offset > 0 && offset >= Number(data.total)) {
+      setOffset(Math.max(0, Math.ceil(Number(data.total) / limit) - 1) * limit)
+    }
+  }, [data, offset, limit])
   const rows = useMemo(() => {
     const list = [...(data?.rows || [])].filter(r => !filter || Object.values(r).some(v => JSON.stringify(v)?.toLowerCase().includes(filter.toLowerCase())))
     if (sortColumn) list.sort((a, b) => String(a[sortColumn] ?? '').localeCompare(String(b[sortColumn] ?? ''), undefined, { numeric: true }) * (direction === 'asc' ? 1 : -1))
@@ -250,14 +258,17 @@ export function TableEditorView() {
         {loading ? <div className="p-5 space-y-2">{[0,1,2,3,4].map(i => <div key={i} className="h-8 rounded bg-surface-200/60 animate-pulse" />)}</div> : <>
           {!data?.editable && <p className="px-4 py-2 text-xs text-amber-500 border-b border-default">This table has no primary key; safe row edit and delete are unavailable. Inserts remain enabled.</p>}
           <div className="flex-1 min-h-0 overflow-auto">{definition ? <TableDefinitionView selectedTable={table} /> : <TableDataGrid selectedTable={table} displayedRows={rows} selectedRowIds={selectedRows} onToggleSelectAll={() => setSelectedRows(selectedRows.size === rows.length ? new Set() : new Set(rows.map((_, i) => String(i))))} onToggleSelectRow={idx => setSelectedRows(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next })} onInsertColumn={() => setInsertColumn(true)} sortColumn={sortColumn} sortDirection={direction} frozenColumnIds={frozenColumns} onColumnAction={columnAction} onUpdateCell={data?.editable && !busy ? cell : undefined} hideFooter />}</div>
-          <div className="shrink-0 flex flex-wrap gap-4 items-center border-t border-default bg-dash-sidebar px-4 py-2 text-xs text-foreground-lighter">
-            <span>{data?.total ?? '—'} total rows · {rows.length} shown</span>
-            <button type="button" className={definition ? 'text-foreground' : 'hover:text-foreground'} onClick={() => setDefinition(false)}>Data</button><button type="button" className={definition ? 'hover:text-foreground' : 'text-foreground'} onClick={() => setDefinition(true)}>Definition</button>
-          <select aria-label="Rows per page" className="bg-studio border border-default rounded" value={limit} onChange={e => { setLimit(Number(e.target.value)); setOffset(0) }}>{[...new Set([25, 50, 100, 250, 1000, limit])].sort((a,b) => a-b).map(n => <option key={n} value={n}>{n} per page</option>)}</select>
-          <button disabled={offset === 0 || busy} onClick={() => setOffset(Math.max(0, offset - limit))} className="disabled:opacity-40">Previous</button>
-          <span>Page {Math.floor(offset / limit) + 1}</span>
-          <button disabled={offset + limit >= Number(data?.total || 0) || busy} onClick={() => setOffset(offset + limit)} className="disabled:opacity-40">Next</button>
-          </div>
+          <TableFooter
+            page={Math.floor(offset / limit) + 1}
+            pageCount={Math.max(1, Math.ceil(Number(data?.total || 0) / limit))}
+            pageSize={limit}
+            recordCount={Number(data?.total || 0)}
+            loading={busy || loading}
+            view={definition ? 'definition' : 'data'}
+            onPageChange={page => setOffset((page - 1) * limit)}
+            onPageSizeChange={size => { setLimit(size); setOffset(0) }}
+            onViewChange={view => setDefinition(view === 'definition')}
+          />
         </>}</> : loading ? <div className="p-5 space-y-2">{[0,1,2,3,4].map(i => <div key={i} className="h-8 rounded bg-surface-200/60 animate-pulse" />)}</div> : error ? <div role="alert" className="m-5 rounded border border-destructive/30 p-4 text-sm text-red-400">{error}<button onClick={() => void loadTables().catch(e => setError(errorMessage(e)))} className="ml-3 underline">Retry</button></div> : <div className="p-10 text-sm text-foreground-lighter">{tables.length ? 'Select a table from the explorer or open a new tab.' : 'No tables in this schema. Create a table or use the SQL editor.'}</div>}
     </section>
     <InsertTableModal open={insertTable} onOpenChange={setInsertTable} schemaName={schema} onInsertTable={async t => {
@@ -289,6 +300,7 @@ export function TableEditorView() {
           statement = editingColumn === c.name ? '' : `ALTER TABLE ${name} RENAME COLUMN ${qi(editingColumn)} TO ${target};`
           statement += `ALTER TABLE ${name} ALTER COLUMN ${target} TYPE ${type} USING ${target}::${type}; ALTER TABLE ${name} ALTER COLUMN ${target} ${c.isNullable ? 'DROP' : 'SET'} NOT NULL; ALTER TABLE ${name} ALTER COLUMN ${target} ${c.defaultValue ? `SET DEFAULT ${c.defaultValue}` : 'DROP DEFAULT'};`
         }
+        if (c.foreignKey) statement += `ALTER TABLE ${name} ADD FOREIGN KEY (${target}) ${foreignKeyReferenceSql(c.foreignKey)};`
         if (c.description !== undefined) statement += `COMMENT ON COLUMN ${name}.${target} IS ${literal(c.description)};`
         const ok = await mutate(async () => { await sql(`BEGIN; ${statement} COMMIT;`); await refresh() }, editingColumn ? 'Column updated' : 'Column created')
         if (ok) { setColumnValues(blankColumn); if (!keepOpen) setInsertColumn(false) }

@@ -15,6 +15,9 @@ import { pushDatabase } from '../../Backend/src/db/push'
 import { withDatabase, quoteIdentifier } from '../../Backend/src/db/socket'
 import { startAdminListeners } from '../../Backend/src/services/system/listener.service'
 import { verifyConnectDb } from './connect-db.browser'
+import { verifyPrimaryKeyIcons } from './primary-key-icons.browser'
+import { verifyForeignKeyPanel } from './foreign-key-panel.browser'
+import { verifyTableFooter } from './table-footer.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
 import { verifyStorageAndBackups } from './backups.browser'
@@ -180,6 +183,32 @@ try {
   })
   assert.equal(csrf.status(), 403)
   if (process.env.STUDIO_AUTH_ONLY === '1') {
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  if (process.env.STUDIO_FOOTER_ONLY === '1') {
+    await verifyTableFooter(page, url, config, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  if (process.env.STUDIO_FOREIGN_KEYS_ONLY === '1') {
+    await verifyForeignKeyPanel(page, url, config, services, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  if (process.env.STUDIO_ICONS_ONLY === '1') {
+    await verifyPrimaryKeyIcons(page, url, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  if (process.env.STUDIO_CONNECT_ONLY === '1') {
+    const mainClient = await services.clientRoles.get(config.DB_NAME)
+    await verifyConnectDb(page, url, { ...config, DB_USER: mainClient.user, DB_PASSWORD: mainClient.password })
+    await snapshot('connect-db')
     assert.deepEqual(browserErrors, [])
     return
   }
@@ -412,13 +441,6 @@ try {
   await verifySqlExecutionFeedback(page, url, config.DB_NAME, setQuery)
   await verifyDashboardMetrics(page, url, config, services)
   await snapshot('dashboard-metrics')
-  if (process.env.STUDIO_CONNECT_ONLY === '1') {
-    const mainClient = await services.clientRoles.get(config.DB_NAME)
-    await verifyConnectDb(page, url, { ...config, DB_USER: mainClient.user, DB_PASSWORD: mainClient.password })
-    await snapshot('connect-db')
-    assert.deepEqual(browserErrors, [])
-    return
-  }
   if (process.env.STUDIO_METRICS_ONLY === '1') {
     assert.deepEqual(browserErrors, [])
     return

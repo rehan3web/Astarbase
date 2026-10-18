@@ -8,6 +8,40 @@ export async function verifyConnectDb(page: Page, url: string, config: Config) {
   await expect(page.getByRole('heading', { name: 'ConnectDb', exact: true })).toBeVisible()
   const editor = page.getByRole('textbox', { name: 'Connection details', exact: true })
   await expect(editor).toHaveValue(/postgresql:.*\*{16}/)
+  const originalTheme = await page.evaluate(() => ({
+    className: document.documentElement.className,
+    attribute: document.documentElement.getAttribute('data-theme'),
+  }))
+  try {
+    for (const theme of ['light', 'dark']) {
+      const colors = await page.locator('[data-connection-snippet]').evaluate((snippet, theme) => {
+        document.documentElement.classList.toggle('dark', theme === 'dark')
+        document.documentElement.setAttribute('data-theme', theme)
+        const reference = document.createElement('div')
+        reference.className = 'bg-surface-200'
+        document.body.appendChild(reference)
+        try {
+          return {
+            panel: getComputedStyle(snippet.closest('section')!).backgroundColor,
+            snippet: getComputedStyle(snippet).backgroundColor,
+            darkSnippet: getComputedStyle(reference).backgroundColor,
+          }
+        } finally { reference.remove() }
+      }, theme)
+      assert.equal(colors.panel, theme === 'light' ? 'rgb(255, 255, 255)' : 'rgba(0, 0, 0, 0)')
+      assert.equal(colors.snippet, theme === 'light' ? 'rgb(255, 255, 255)' : colors.darkSnippet)
+      await page.screenshot({
+        path: `../../generated-artifacts/ui-restoration/connect-db-${theme}.jpg`,
+        fullPage: true,
+      })
+    }
+  } finally {
+    await page.evaluate(original => {
+      document.documentElement.className = original.className
+      if (original.attribute === null) document.documentElement.removeAttribute('data-theme')
+      else document.documentElement.setAttribute('data-theme', original.attribute)
+    }, originalTheme)
+  }
   const response = await page.request.get(`${url}/api/studio/databases/${config.DB_NAME}/connection`)
   assert.equal(response.status(), 200)
   assert.match(response.headers()['cache-control'], /no-store/)

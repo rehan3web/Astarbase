@@ -137,9 +137,22 @@ export function InsertRowModal({
                         {c.dataType}
                       </span>
                       {c.isPrimaryKey && (
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand/10 text-brand border border-brand/20 font-medium">
-                          PK
-                        </span>
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                          className="text-emerald-500 dark:text-emerald-400 shrink-0"
+                        >
+                          <path d="m2 21 9.6-9.6" />
+                          <path d="m7.5 15.5 2.3 2.3a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0L4 19" />
+                          <circle cx="15.5" cy="7.5" r="5.5" />
+                        </svg>
                       )}
                     </div>
 

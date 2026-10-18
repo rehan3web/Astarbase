@@ -452,6 +452,11 @@ div[data-radix-portal]:not(.portal--toast) {
   @apply z-50!;
 }
 
+/* Nested foreign-key selectors must remain above their z-60 dialog overlay. */
+[data-radix-popper-content-wrapper]:has([data-foreign-key-select]) {
+  z-index: 70 !important;
+}
+
 .settings-container {
   @apply mx-auto max-w-4xl xl:max-w-6xl;
 }

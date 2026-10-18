@@ -239,7 +239,7 @@ export function ConnectDbView() {
             </Button>
           </section>
         ) : (
-          <section className="overflow-hidden rounded-lg border border-default">
+          <section className="overflow-hidden rounded-lg border border-default bg-white dark:bg-transparent">
             <div role="tablist" aria-label="Connection method" className="flex overflow-x-auto border-b border-default bg-surface-200/60">
               {tabs.map(item => (
                 <button
@@ -273,7 +273,7 @@ export function ConnectDbView() {
                 </p>
               )}
 
-              <div data-connection-snippet className="overflow-hidden rounded-md border border-strong bg-surface-200">
+              <div data-connection-snippet className="overflow-hidden rounded-md border border-strong bg-white dark:bg-surface-200">
                 <textarea
                   id="connection-editor"
                   aria-label="Connection details"

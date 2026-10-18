@@ -185,8 +185,8 @@ export function BackupsPageView() {
       </div>
 
       {/* Backups List — original 12-column row and action-menu composition */}
-      <div className="rounded-lg border border-default bg-surface-100 overflow-hidden divide-y divide-border-muted shadow-xs">
-        <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-2.5 bg-surface-200/50 text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">
+      <div className="rounded-lg border border-default overflow-hidden shadow-xs">
+        <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-2.5 bg-surface-200/60 border-b border-default text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">
           <div className="col-span-4">Backup name</div>
           <div className="col-span-2">Type</div>
           <div className="col-span-2">Size</div>
@@ -194,7 +194,7 @@ export function BackupsPageView() {
           <div className="col-span-1 text-right">Actions</div>
         </div>
         {filtered.map(backup => (
-          <div key={backup.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-surface-200/40 transition-colors group text-sm">
+          <div key={backup.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center border-b border-default last:border-b-0 hover:bg-surface-200/40 transition-colors group text-sm">
             <div className="col-span-12 sm:col-span-4 flex items-center gap-2.5 min-w-0">
               <Archive className="h-4 w-4 text-foreground-lighter shrink-0" />
               <div className="min-w-0">
