@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Clipboard, Eye, EyeOff, Plug, RotateCw } from 'lucide-react'
 import { useStudio } from '@/components/providers/StudioProvider'
+import { LoadingIndicator } from '@/components/ui/spinner'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
@@ -210,13 +211,8 @@ export function ConnectDbView() {
         </div>
 
         {loading ? (
-          <section aria-label="Loading connection details" className="overflow-hidden rounded-lg border border-default">
-            <div className="h-11 animate-pulse border-b border-default bg-surface-200/60" />
-            <div className="space-y-4 p-5">
-              <div className="h-4 w-44 animate-pulse rounded bg-surface-300" />
-              <div className="h-24 animate-pulse rounded-md border border-default bg-surface-200" />
-              <div className="h-8 w-32 animate-pulse rounded bg-surface-300" />
-            </div>
+          <section aria-label="Loading connection details" className="grid min-h-48 place-items-center rounded-lg border border-default">
+            <LoadingIndicator label="Loading connection details" size={28} />
           </section>
         ) : loadError || !activeMetadata ? (
           <section className="rounded-lg border border-default bg-studio p-6">

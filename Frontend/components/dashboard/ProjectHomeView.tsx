@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { SyncActivityChart } from '@/components/dashboard/SyncActivityChart'
+import { Spinner } from '@/components/ui/spinner'
 import {
   DashboardMetrics,
   formatBytes,
@@ -12,13 +13,18 @@ import {
   formatTimestamp,
 } from '@/lib/dashboard-metrics'
 
-function MetricCard({ title, value, badges }: { title: string; value: React.ReactNode; badges: string[] }) {
+function MetricCard({ title, value, badges, loading = false }: { title: string; value: React.ReactNode; badges: string[]; loading?: boolean }) {
   return (
-    <div className="relative flex h-fit min-w-0 self-start flex-col rounded-xl border border-default bg-studio p-4 transition-colors hover:border-strong">
+    <div data-metric-card={title} aria-busy={loading} className="relative flex h-fit min-w-0 self-start flex-col rounded-xl border border-default bg-studio p-4 transition-colors hover:border-strong">
       <h3 className="break-words text-base font-semibold leading-tight text-foreground">{title}</h3>
-      <p className="mt-1 min-w-0 break-words text-base text-foreground-lighter">{value}</p>
+      <p className="mt-1 min-w-0 break-words text-base text-foreground-lighter">
+        {loading ? <span data-skeleton="true" aria-hidden="true" className="block h-5 w-28 motion-safe:animate-pulse rounded bg-surface-200" /> : value}
+        {loading && <span className="sr-only">Loading {title}</span>}
+      </p>
       <div className="mt-3 flex min-w-0 flex-wrap items-start gap-1.5">
-        {badges.map(b => <span key={b} className="inline-flex min-w-0 max-w-full break-words whitespace-normal rounded-md border border-strong px-1.5 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wide text-foreground-light">{b}</span>)}
+        {loading
+          ? <span data-skeleton="true" aria-hidden="true" className="h-5 w-24 motion-safe:animate-pulse rounded-md bg-surface-200" />
+          : badges.map(b => <span key={b} className="inline-flex min-w-0 max-w-full break-words whitespace-normal rounded-md border border-strong px-1.5 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wide text-foreground-light">{b}</span>)}
       </div>
     </div>
   )
@@ -86,6 +92,7 @@ export function ProjectHomeView() {
   }, [database, key, refreshToken])
 
   const current = metricsKey === key ? metrics : null
+  const metricsLoading = loading || !current
   const latest = current?.latest ?? null
   const sampleAge = latest?.sampledAt && now > 0 ? now - new Date(latest.sampledAt).getTime() : Infinity
   const isStale = current?.stale || (Number.isFinite(sampleAge) && sampleAge > 90_000)
@@ -96,6 +103,7 @@ export function ProjectHomeView() {
   ]
   const retry = useCallback(() => {
     setError('')
+    setLoading(true)
     setRefreshToken(value => value + 1)
   }, [])
 
@@ -110,13 +118,13 @@ export function ProjectHomeView() {
           </div>
           <p className="text-sm text-foreground-lighter mt-1 flex flex-wrap items-center gap-2">
             <span className="font-mono">{database}</span><span>·</span>
-            <span>{loading && !current ? 'Loading persisted metrics…' : current ? `Sampled every ${current.intervalSeconds}s` : 'Metrics unavailable'}</span><span>·</span>
+            <span>{metricsLoading ? <><Spinner size={14} decorative /><span className="sr-only">Loading persisted metrics</span></> : current ? `Sampled every ${current.intervalSeconds}s` : 'Metrics unavailable'}</span><span>·</span>
             <span>{branches.length} managed databases</span>
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button type="button" onClick={retry} disabled={loading} className="rounded-md border border-strong px-3 py-2 text-xs font-medium text-foreground-light transition-colors hover:bg-dash-sidebar disabled:opacity-50">
-            {loading ? 'Refreshing…' : 'Refresh'}
+            {loading ? <><Spinner size={14} decorative />Refreshing…</> : 'Refresh'}
           </button>
         </div>
       </div>
@@ -141,27 +149,31 @@ export function ProjectHomeView() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Database Size"
-          value={latest ? formatBytes(latest.databaseSizeBytes) : loading ? 'Loading…' : 'Unavailable'}
+          value={latest ? formatBytes(latest.databaseSizeBytes) : 'Unavailable'}
           badges={[latest?.databaseError ? 'Database stats partial' : 'Selected database']}
+          loading={metricsLoading}
         />
         <MetricCard
           title="Connections"
-          value={latest ? formatMetric(latest.connections) : loading ? 'Loading…' : 'Unavailable'}
+          value={latest ? formatMetric(latest.connections) : 'Unavailable'}
           badges={[latest?.activeConnections == null ? 'Active unavailable' : `${formatMetric(latest.activeConnections)} active`, latest?.maxConnections == null ? 'Limit unavailable' : `${formatMetric(latest.maxConnections)} max`]}
+          loading={metricsLoading}
         />
         <MetricCard
           title="Compute CPU"
-          value={latest ? formatMetric(latest.cpuPercent, '%') : loading ? 'Loading…' : 'Unavailable'}
+          value={latest ? formatMetric(latest.cpuPercent, '%') : 'Unavailable'}
           badges={['Shared Postgres container']}
+          loading={metricsLoading}
         />
         <MetricCard
           title="RAM Usage"
-          value={latest ? formatBytes(latest.memoryUsageBytes) : loading ? 'Loading…' : 'Unavailable'}
+          value={latest ? formatBytes(latest.memoryUsageBytes) : 'Unavailable'}
           badges={[latest?.memoryLimitBytes == null ? 'Limit unavailable' : `of ${formatBytes(latest.memoryLimitBytes)}`, 'Shared container']}
+          loading={metricsLoading}
         />
       </div>
 
-      <SyncActivityChart activity={current?.activity ?? null} />
+      <SyncActivityChart activity={current?.activity ?? null} loading={metricsLoading} />
 
       {/* Unsupported service cards remain unchanged rather than implying telemetry exists. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

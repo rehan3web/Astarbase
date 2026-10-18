@@ -12,6 +12,7 @@ import { api, SqlResponse, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { parseSqlExecutionOutput } from '@/lib/sql-results'
 import { useNotifications } from '@/components/providers/NotificationProvider'
+import { Spinner } from '@/components/ui/spinner'
 
 type SqlLibrary = { folders: SqlFolder[]; snippets: SqlSnippet[] }
 type Visibility = 'private' | 'shared'
@@ -535,9 +536,9 @@ export function SqlEditorView() {
           unsavedSnippetIds={unsavedSnippetIds}
         />
         {isLoading && (
-          <div className="h-10 shrink-0 border-b border-default bg-dash-sidebar px-4 flex items-center gap-2 text-xs text-foreground-lighter">
-            <span className="h-3 w-3 rounded-full border-2 border-foreground-muted/30 border-t-foreground-muted animate-spin" />
-            Loading saved snippets…
+          <div role="status" aria-label="Loading saved snippets" className="h-10 shrink-0 border-b border-default bg-dash-sidebar px-4 flex items-center gap-2 text-xs text-foreground-lighter">
+            <Spinner size={16} decorative />
+            <span className="sr-only">Loading saved snippets</span>
           </div>
         )}
         <SqlActionToolbar

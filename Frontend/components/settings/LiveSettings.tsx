@@ -9,6 +9,7 @@ import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import { DatabaseMaintenance } from './DatabaseMaintenance'
+import { Spinner } from '@/components/ui/spinner'
 
 type PoolSettings = { poolSize: number; maxClientConnections: number }
 
@@ -102,7 +103,10 @@ function DatabaseSettings({ database, main }: { database: string; main: boolean 
             </div>
             <div className="p-6 border-b border-default flex flex-col sm:flex-row gap-5 sm:gap-8">
               <div className="flex-1"><h3 className="text-sm font-medium text-foreground mb-1">Connection pool size</h3><p className="text-sm text-foreground-lighter">Server connections per user and database pair, from 1 to 80. Total usage also depends on Postgres capacity.</p></div>
-              <div className="w-full sm:w-64"><Input aria-label="Connection pool size" type="number" min={1} max={80} required disabled={!pool || saving} value={pool ? poolSize : ''} placeholder="Loading…" onChange={event => setPoolSize(event.target.value)} /><p className="mt-1 text-xs text-foreground-muted">Applied dynamically without restarting the database.</p></div>
+              <div className="w-full sm:w-64">
+                {main && !pool && !poolError ? <div className="flex h-9 items-center justify-center"><Spinner size={18} aria-label="Loading connection pool settings" /></div> : <Input aria-label="Connection pool size" type="number" min={1} max={80} required disabled={!pool || saving} value={pool ? poolSize : ''} onChange={event => setPoolSize(event.target.value)} />}
+                <p className="mt-1 text-xs text-foreground-muted">Applied dynamically without restarting the database.</p>
+              </div>
             </div>
             <div className="p-6 border-b border-default flex flex-col sm:flex-row gap-5 sm:gap-8">
               <div className="flex-1"><h3 className="text-sm font-medium text-foreground mb-1">Max client connections</h3><p className="text-sm text-foreground-lighter">Fixed limit across the entire PgBouncer instance, including all branches.</p></div>

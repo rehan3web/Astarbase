@@ -46,6 +46,7 @@ import { useTheme } from '@/components/providers/ThemeProvider'
 import { api, Diagram, SchemaEdge, SchemaNode, errorMessage } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { copyText } from '@/lib/copy-text'
+import { LoadingIndicator } from '@/components/ui/spinner'
 
 type TableNodeData = {
   table: SchemaNode
@@ -260,7 +261,7 @@ function SchemaVisualizerInner() {
   const [selectedSchema, setSelectedSchema] = useState('public')
   const [searchQuery, setSearchQuery] = useState('')
   const [errorMessageText, setErrorMessageText] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [copyingSql, setCopyingSql] = useState(false)
   const copyRequest = useRef<AbortController | null>(null)
   const currentDatabase = useRef(database)
@@ -299,6 +300,7 @@ function SchemaVisualizerInner() {
   }, [loadSchema])
 
   const liveDiagram = diagram?.database === database ? diagram : null
+  const schemaPending = isLoading || (!liveDiagram && !errorMessageText)
   const schemas = useMemo(() => [...new Set(liveDiagram?.nodes.map(table => table.schema) || [])], [liveDiagram])
   const schemaTables = useMemo(() => (liveDiagram?.nodes || []).filter(table => table.schema === selectedSchema), [liveDiagram, selectedSchema])
   const schemaEdges = useMemo(() => {
@@ -423,7 +425,7 @@ function SchemaVisualizerInner() {
   }, [nodes, edges, isDark, selectedSchema, notify])
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-studio relative">
+    <div role="region" aria-label={schemaPending ? 'Loading schema visualizer' : 'Schema visualizer'} aria-busy={schemaPending} className="flex flex-col h-full w-full overflow-hidden bg-studio relative">
 
       {/* Original top toolbar: schema selector, search, split SQL/export control, auto layout */}
       <div className="h-11 shrink-0 border-b border-default bg-dash-sidebar flex items-center justify-between px-4 z-10 select-none">
@@ -455,8 +457,8 @@ function SchemaVisualizerInner() {
       </div>
 
       {errorMessageText && <div role="alert" className="flex items-center justify-between border-b border-default p-3 text-xs text-red-400">{errorMessageText}<button type="button" onClick={() => void loadSchema(undefined, true)} className="underline">Retry</button></div>}
-      {isLoading && <div className="absolute top-14 left-4 z-10 rounded-md border border-default bg-surface-100/90 px-3 py-2 text-xs text-foreground-lighter">Loading live schema…</div>}
-      {!isLoading && !errorMessageText && !nodes.length && <div className="absolute inset-0 top-11 z-10 grid place-items-center pointer-events-none"><div className="rounded-lg border border-default bg-surface-100/90 p-6 text-center text-sm text-foreground-lighter">{schemas.length ? 'No tables in this schema.' : 'No database tables found.'}<br /><span className="text-xs">Create tables in the Table Editor or run DDL in SQL Editor.</span></div></div>}
+      {schemaPending && <LoadingIndicator label="Loading schema visualizer" className="absolute inset-x-0 bottom-0 top-11 z-20 bg-studio/40 backdrop-blur-[1px]" size={30} />}
+      {!schemaPending && !errorMessageText && !nodes.length && <div className="absolute inset-0 top-11 z-10 grid place-items-center pointer-events-none"><div className="rounded-lg border border-default bg-surface-100/90 p-6 text-center text-sm text-foreground-lighter">{schemas.length ? 'No tables in this schema.' : 'No database tables found.'}<br /><span className="text-xs">Create tables in the Table Editor or run DDL in SQL Editor.</span></div></div>}
 
       {/* Original interactive entity-relationship canvas and bottom controls */}
       <div className="flex-1 w-full h-full relative bg-[#FAFAFA] dark:bg-[#121212]">

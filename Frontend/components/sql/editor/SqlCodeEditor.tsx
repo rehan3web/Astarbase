@@ -3,10 +3,11 @@
 import React from 'react'
 import dynamic from 'next/dynamic'
 import { useTheme } from '@/components/providers/ThemeProvider'
+import { LoadingIndicator } from '@/components/ui/spinner'
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
-  loading: () => <div className="flex-1 flex items-center justify-center bg-surface-100 text-foreground-lighter text-xs font-mono">Loading SQL Editor…</div>,
+  loading: () => <LoadingIndicator label="Loading SQL editor" className="flex-1 bg-surface-100" size={28} />,
 })
 interface SqlCodeEditorProps { value: string; onChange: (value: string) => void }
 export function SqlCodeEditor({ value, onChange }: SqlCodeEditorProps) {

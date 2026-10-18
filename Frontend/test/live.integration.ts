@@ -18,6 +18,7 @@ import { verifyConnectDb } from './connect-db.browser'
 import { verifyPrimaryKeyIcons } from './primary-key-icons.browser'
 import { verifyForeignKeyPanel } from './foreign-key-panel.browser'
 import { verifyTableFooter } from './table-footer.browser'
+import { verifyLoadingStates } from './loading-states.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
 import { verifyStorageAndBackups } from './backups.browser'
@@ -183,6 +184,12 @@ try {
   })
   assert.equal(csrf.status(), 403)
   if (process.env.STUDIO_AUTH_ONLY === '1') {
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+
+  if (process.env.STUDIO_LOADING_ONLY === '1') {
+    await verifyLoadingStates(page, url, snapshot)
     assert.deepEqual(browserErrors, [])
     return
   }

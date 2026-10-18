@@ -13,6 +13,7 @@ import { ConfirmRlsChangeDialog } from './ConfirmRlsChangeDialog'
 import type { RlsConfirmation } from './ConfirmRlsChangeDialog'
 import { PolicyDialog } from './PolicyDialog'
 import { policyPath, PolicyPayload, RlsCatalog, RlsPolicy, RlsTable } from './rls-types'
+import { LoadingIndicator, Spinner } from '@/components/ui/spinner'
 
 const tableId = (table: Pick<RlsTable, 'schema' | 'name'>) => JSON.stringify([table.schema, table.name])
 const commandLabel = (command: string) => command === 'ALL' ? 'All commands' : command
@@ -159,7 +160,7 @@ export function PoliciesPageView() {
     <PopoverTrigger asChild>
       <Button variant="default" role="combobox" aria-label="Policy table" aria-expanded={tableDropdownOpen} aria-controls="policy-table-options" aria-haspopup="listbox" className="h-9 min-w-0 max-w-full justify-between text-xs sm:w-[19rem]">
         <TableIcon className="mr-2 h-3.5 w-3.5 shrink-0 text-foreground-lighter" />
-        <span className="mr-auto truncate">{current ? `${current.schema}.${current.name}` : loading ? 'Loading tables…' : 'Select a table'}</span>
+        <span className="mr-auto truncate">{current ? `${current.schema}.${current.name}` : loading ? <Spinner size={14} aria-label="Loading tables" /> : 'Select a table'}</span>
         <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 text-foreground-lighter" />
       </Button>
     </PopoverTrigger>
@@ -213,7 +214,7 @@ export function PoliciesPageView() {
           <h1 className="text-2xl font-medium tracking-tight text-foreground">Row level security</h1>
           <p className="mt-1 max-w-2xl text-sm text-foreground-lighter">Control which rows each database role can read or change.</p>
         </div>
-        <Button variant="default" size="small" onClick={() => void load()} disabled={loading}><RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh</Button>
+        <Button variant="default" size="small" onClick={() => void load()} disabled={loading} iconLeft={<RefreshCw className="h-3.5 w-3.5" />}>{loading && <Spinner size={14} decorative />} Refresh</Button>
       </header>
 
       <div className="mb-3">
@@ -225,7 +226,7 @@ export function PoliciesPageView() {
           <div className="flex min-w-0 items-center gap-2.5">
             <TableIcon className={`h-4 w-4 shrink-0 ${current && !current.enabled ? 'text-amber-600 dark:text-amber-400' : 'text-foreground-lighter'}`} />
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <code className="truncate font-mono text-sm font-medium text-foreground">{current ? `${current.schema}.${current.name}` : loading ? 'Loading tables…' : 'No table selected'}</code>
+              <code className="truncate font-mono text-sm font-medium text-foreground">{current ? `${current.schema}.${current.name}` : loading ? <Spinner size={16} aria-label="Loading tables" /> : 'No table selected'}</code>
               {current && !current.enabled && <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">RLS disabled</span>}
               {current?.forced && <span className="rounded-full bg-surface-200 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-foreground-lighter">Force on</span>}
             </div>
@@ -251,11 +252,7 @@ export function PoliciesPageView() {
           {operationError && <button type="button" onClick={() => setOperationError('')} className="ml-3 underline">Dismiss</button>}
         </div>}
 
-        {loading && !catalog ? <div aria-label="Loading policies" className="space-y-3 p-5">
-          <div className="h-5 w-48 animate-pulse rounded bg-surface-200" />
-          <div className="h-14 animate-pulse rounded bg-surface-200/70" />
-          <div className="h-14 animate-pulse rounded bg-surface-200/70" />
-        </div> : error && !catalog ? <div className="p-10 text-center">
+        {loading && !catalog ? <LoadingIndicator label="Loading policies" className="min-h-48" size={26} /> : error && !catalog ? <div className="p-10 text-center">
           <p className="text-sm text-foreground">Could not load row security settings.</p><p className="mt-1 text-xs text-foreground-lighter">{error}</p>
           <Button variant="default" size="small" className="mt-4" onClick={() => void load()}>Retry</Button>
         </div> : !current ? <div className="p-10 text-center">

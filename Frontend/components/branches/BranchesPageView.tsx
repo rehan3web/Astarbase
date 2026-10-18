@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   GitBranch,
   HardDrive,
-  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -35,9 +34,10 @@ import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import { getTagBadgeStyle, isValidBranchTag } from '@/components/branches/branchTag'
 import { formatBytes } from '@/lib/dashboard-metrics'
+import { LoadingIndicator, Spinner } from '@/components/ui/spinner'
 
 export function BranchesPageView() {
-  const { branches, branch: activeBranch, selectBranch, reload } = useStudio()
+  const { branches, branch: activeBranch, selectBranch, reload, branchesLoading } = useStudio()
   const { notify } = useNotifications()
   const [createOpen, setCreateOpen] = useState(false)
   const [refreshOpen, setRefreshOpen] = useState(false)
@@ -177,7 +177,7 @@ export function BranchesPageView() {
       {error && <div role="alert" className="border border-destructive/30 bg-destructive/5 rounded-md px-3 py-2 text-sm text-red-400">{error}</div>}
 
       {/* Branches Table — original five-column layout; unavailable metadata is explicit */}
-      <div className="rounded-lg border border-default overflow-hidden">
+      <div role="region" aria-label={branchesLoading ? 'Loading branches' : 'Branch list'} aria-busy={branchesLoading} className="rounded-lg border border-default overflow-hidden">
         <div className="grid grid-cols-[2fr_1fr_1fr_1fr_48px] bg-surface-200/60 border-b border-default px-4 py-2.5">
           <span className="text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">Branch name</span>
           <span className="text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">Tag</span>
@@ -244,7 +244,9 @@ export function BranchesPageView() {
             </div>
           )
         })}
-        {branches.length === 0 && <div className="px-4 py-12 text-center text-sm text-foreground-lighter">No branches found. Check the backend connection and retry.</div>}
+        {branchesLoading && branches.length > 0 && <div className="flex justify-center border-t border-default py-4"><Spinner size={20} aria-label="Refreshing branches" /></div>}
+        {branchesLoading && branches.length === 0 && <LoadingIndicator label="Loading branches" className="py-12" />}
+        {!branchesLoading && branches.length === 0 && <div className="px-4 py-12 text-center text-sm text-foreground-lighter">No branches found. Check the backend connection and retry.</div>}
       </div>
 
       {/* Create Branch Dialog — same original shell, live parent database field */}
@@ -281,7 +283,7 @@ export function BranchesPageView() {
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">
               <button type="button" onClick={() => setCreateOpen(false)} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-foreground-lighter hover:text-foreground hover:bg-surface-200 rounded-md transition-colors">Cancel</button>
               <button type="submit" disabled={!newBranchName.trim() || busy || !parentDatabase} className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-foreground bg-surface-300 hover:bg-surface-200 disabled:opacity-50 disabled:pointer-events-none border border-strong rounded-md transition-colors shadow-xs">
-                {busy ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating...</> : 'Create branch'}
+                {busy ? <><Spinner size={14} decorative />Creating...</> : 'Create branch'}
               </button>
             </DialogFooter>
           </form>
@@ -304,7 +306,7 @@ export function BranchesPageView() {
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">
               <button type="button" onClick={() => setTagOpen(false)} disabled={tagBusy} className="px-3 py-1.5 text-xs font-medium text-foreground-lighter hover:text-foreground hover:bg-surface-200 rounded-md transition-colors">Cancel</button>
               <button type="submit" aria-label="Save tag" disabled={tagBusy} className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-foreground bg-surface-300 hover:bg-surface-200 disabled:opacity-50 disabled:pointer-events-none border border-strong rounded-md transition-colors shadow-xs">
-                {tagBusy ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Saving...</> : 'Save tag'}
+                {tagBusy ? <><Spinner size={14} decorative />Saving...</> : 'Save tag'}
               </button>
             </DialogFooter>
           </form>

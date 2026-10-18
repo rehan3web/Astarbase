@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import { GitBranch, Search, Plus, Check, ChevronsUpDown, Loader2 } from 'lucide-react'
+import { GitBranch, Search, Plus, Check, ChevronsUpDown } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import { getTagBadgeStyle, isValidBranchTag } from '@/components/branches/branchTag'
+import { Spinner } from '@/components/ui/spinner'
 
 export function BranchSwitcher() {
   const { branches, branch: activeBranch, database, selectBranch, reload } = useStudio()
@@ -106,7 +107,7 @@ export function BranchSwitcher() {
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">
               <button type="button" onClick={() => setDialogOpen(false)} disabled={isCreating} className="px-3 py-1.5 text-xs font-medium text-foreground-lighter hover:text-foreground hover:bg-surface-200 rounded-md transition-colors">Cancel</button>
               <button type="submit" disabled={!newBranchName.trim() || isCreating} className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-foreground bg-surface-300 hover:bg-surface-200 disabled:opacity-50 disabled:pointer-events-none border border-strong rounded-md transition-colors shadow-xs">
-                {isCreating ? <><Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" />Creating branch...</> : 'Create branch'}
+                {isCreating ? <><Spinner size={14} decorative />Creating branch...</> : 'Create branch'}
               </button>
             </DialogFooter>
           </form>

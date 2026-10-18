@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import type { ActivityTelemetry, ActivityBucket } from '@/lib/dashboard-metrics'
+import { LoadingIndicator } from '@/components/ui/spinner'
 
 type MetricMode = 'runs' | 'rows'
 const EMPTY_BUCKETS: ActivityBucket[] = []
@@ -36,7 +37,7 @@ function bucketTotals(bucket: ActivityBucket, mode: MetricMode): number[] | null
     : [(metrics as NonNullable<ActivityBucket['rows']>).inserted, (metrics as NonNullable<ActivityBucket['rows']>).updated, (metrics as NonNullable<ActivityBucket['rows']>).deleted]
 }
 
-export function SyncActivityChart({ activity }: { activity: ActivityTelemetry | null }) {
+export function SyncActivityChart({ activity, loading = false }: { activity: ActivityTelemetry | null; loading?: boolean }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [metricMode, setMetricMode] = useState<MetricMode>('runs')
@@ -65,12 +66,12 @@ export function SyncActivityChart({ activity }: { activity: ActivityTelemetry | 
   const rangeLabel = '24 hours'
 
   return (
-    <section className="relative flex flex-col rounded-xl border border-default bg-studio p-6 shadow-xs transition-colors hover:border-strong" aria-labelledby="sync-activity-title">
+    <section className="relative flex flex-col rounded-xl border border-default bg-studio p-6 shadow-xs transition-colors hover:border-strong" aria-labelledby="sync-activity-title" aria-label={loading ? 'Loading sync activity' : undefined} aria-busy={loading}>
       <div className="flex flex-col justify-between gap-4 pb-4 sm:flex-row sm:items-start">
         <div>
           <h2 id="sync-activity-title" className="text-base font-semibold leading-tight tracking-tight text-foreground">Sync Activity</h2>
           <p className="mt-1 text-xs text-foreground-lighter" aria-live="polite">
-            {activity
+            {loading ? <span className="sr-only">Loading sync activity</span> : activity
               ? `${formatCount(grandTotal)} recorded ${unit} in ${rangeLabel} · ${observed.length} of ${buckets.length} bins observed${metricMode === 'runs' ? ` · Slow ≥ ${formatCount(activity.slowThresholdMs)} ms` : ''}`
               : `Persisted activity telemetry · ${rangeLabel}`}
           </p>
@@ -101,9 +102,11 @@ export function SyncActivityChart({ activity }: { activity: ActivityTelemetry | 
         </div>
       </div>
 
-      {!activity ? (
-        <div className="grid h-52 grid-cols-[repeat(24,minmax(0,1fr))] items-end gap-1.5 pt-4 sm:gap-2 md:gap-2.5" aria-label="Activity chart loading">
-          <div className="col-start-1 h-full animate-pulse rounded-md bg-surface-200" />
+      {loading ? (
+        <LoadingIndicator label="Loading sync activity" className="h-52" size={28} />
+      ) : !activity ? (
+        <div className="flex h-52 items-center justify-center rounded-lg border border-dashed border-strong text-sm text-foreground-lighter">
+          Activity telemetry is unavailable.
         </div>
       ) : buckets.length === 0 ? (
         <div className="flex h-52 items-center justify-center rounded-lg border border-dashed border-strong text-sm text-foreground-lighter">
@@ -185,7 +188,7 @@ export function SyncActivityChart({ activity }: { activity: ActivityTelemetry | 
           )}
         </>
       )}
-      {activity && observed.length > 0 && grandTotal === 0 && (
+      {!loading && activity && observed.length > 0 && grandTotal === 0 && (
         <p className="mt-2 text-[11px] text-foreground-muted">Observed bins contain zero {unit}; zero values are shown without a bar.</p>
       )}
     </section>

@@ -5,7 +5,6 @@ import {
   Archive,
   Download,
   HardDrive,
-  Loader2,
   MoreHorizontal,
   Plus,
   RotateCcw,
@@ -32,6 +31,7 @@ import { Button } from '@/components/ui/button'
 import { api, Backup, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
 import { useNotifications } from '@/components/providers/NotificationProvider'
+import { LoadingIndicator, Spinner } from '@/components/ui/spinner'
 
 function formatBytes(size: number) {
   if (!Number.isFinite(size) || size < 0) return '—'
@@ -44,7 +44,7 @@ export function BackupsPageView() {
   const { notify } = useNotifications()
   const [backups, setBackups] = useState<Backup[]>([])
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -177,15 +177,15 @@ export function BackupsPageView() {
           <Input placeholder="Search backups..." value={search} onChange={event => setSearch(event.target.value)} className="pl-9 bg-surface-100 border-default text-xs h-8 text-foreground placeholder:text-foreground-muted focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" />
         </div>
         <div className="flex items-center gap-2 text-xs text-foreground-lighter flex-wrap">
-          <span>{loading ? 'Loading backups…' : `${backups.length} backups`}</span>
+          <span>{loading ? <><Spinner size={14} decorative /><span className="sr-only">Loading backups</span></> : `${backups.length} backups`}</span>
           <span className="text-border-strong">•</span>
-          <span>Total storage: {loading ? '—' : formatBytes(totalBytes)}</span>
-          <Button variant="default" size="tiny" disabled={loading || !!busy} iconLeft={loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />} onClick={() => loadBackups().then(() => notify('Backups refreshed')).catch(reason => { const message = errorMessage(reason); setError(message); notify(message, 'error') })}>Refresh</Button>
+          <span>Total storage: {loading ? <Spinner size={14} decorative /> : formatBytes(totalBytes)}</span>
+          <Button variant="default" size="tiny" disabled={loading || !!busy} iconLeft={<RotateCcw className="h-3 w-3" />} onClick={() => loadBackups().then(() => notify('Backups refreshed')).catch(reason => { const message = errorMessage(reason); setError(message); notify(message, 'error') })}>Refresh</Button>
         </div>
       </div>
 
       {/* Backups List — original 12-column row and action-menu composition */}
-      <div className="rounded-lg border border-default overflow-hidden shadow-xs">
+      <div role="region" aria-label={loading ? 'Loading backups' : 'Backups list'} aria-busy={loading} className="rounded-lg border border-default overflow-hidden shadow-xs">
         <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-2.5 bg-surface-200/60 border-b border-default text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">
           <div className="col-span-4">Backup name</div>
           <div className="col-span-2">Type</div>
@@ -193,6 +193,7 @@ export function BackupsPageView() {
           <div className="col-span-3">Created at</div>
           <div className="col-span-1 text-right">Actions</div>
         </div>
+        {loading && filtered.length > 0 && <LoadingIndicator label="Refreshing backups" className="py-6" size={20} />}
         {filtered.map(backup => (
           <div key={backup.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center border-b border-default last:border-b-0 hover:bg-surface-200/40 transition-colors group text-sm">
             <div className="col-span-12 sm:col-span-4 flex items-center gap-2.5 min-w-0">
@@ -237,7 +238,7 @@ export function BackupsPageView() {
         ))}
         {filtered.length === 0 && (
           <div className="px-4 py-12 text-center text-sm text-foreground-lighter">
-            {loading ? 'Checking backend archive storage…' : backups.length ? 'No backups found matching your search.' : 'No backups found. Create your first backup snapshot to protect your data.'}
+            {loading ? <LoadingIndicator label="Loading backups" className="py-2" size={20} /> : backups.length ? 'No backups found matching your search.' : 'No backups found. Create your first backup snapshot to protect your data.'}
           </div>
         )}
       </div>
@@ -258,7 +259,7 @@ export function BackupsPageView() {
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">
               <button type="button" onClick={() => setCreateOpen(false)} disabled={!!busy} className="px-3 py-1.5 text-xs font-medium text-foreground-lighter hover:text-foreground hover:bg-surface-200 rounded-md transition-colors">Cancel</button>
               <button type="submit" disabled={!newBackupName.trim() || !!busy} className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-foreground bg-surface-300 hover:bg-surface-200 disabled:opacity-50 disabled:pointer-events-none border border-strong rounded-md transition-colors shadow-xs">
-                {busy === 'create' ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating backup...</> : 'Create backup'}
+                {busy === 'create' ? <><Spinner size={14} decorative />Creating backup...</> : 'Create backup'}
               </button>
             </DialogFooter>
           </form>

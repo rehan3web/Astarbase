@@ -8,6 +8,7 @@ import { useStudio } from '@/components/providers/StudioProvider'
 import { api, type Diagram, type SchemaNode, errorMessage } from '@/lib/api'
 import { foreignKeyActions, type ForeignKeyAction, type ForeignKeyDraft } from '@/lib/foreign-keys'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 
 interface ForeignKeyPanelProps {
   open: boolean
@@ -192,7 +193,7 @@ export function ForeignKeyPanel({
                   disabled={loading || !!error || tables.length === 0}
                 >
                   <SelectTrigger id="foreign-key-target-table" aria-label="Select a table to reference">
-                    <SelectValue placeholder={loading ? 'Loading tables…' : 'Select a table to reference…'} />
+                    <SelectValue placeholder={loading ? <Spinner size={14} aria-label="Loading tables" /> : 'Select a table to reference…'} />
                   </SelectTrigger>
                   <SelectContent data-foreign-key-select>
                     {tables.map((table) => (
@@ -202,12 +203,7 @@ export function ForeignKeyPanel({
                     ))}
                   </SelectContent>
                 </Select>
-                {loading && (
-                  <div aria-label="Loading tables" className="mt-3 space-y-2">
-                    <div className="h-3 w-2/3 animate-pulse rounded bg-surface-300" />
-                    <div className="h-3 w-1/2 animate-pulse rounded bg-surface-300" />
-                  </div>
-                )}
+                {loading && <div role="status" aria-label="Loading tables" className="mt-3 flex justify-center"><Spinner size={18} /></div>}
                 {error && (
                   <div role="alert" className="mt-3 rounded-md border border-red-500/30 bg-red-500/5 p-3">
                     <p className="text-xs text-foreground">{error}</p>

@@ -1,11 +1,12 @@
 'use client'
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { api, Branch, AdminSettings, errorMessage } from '@/lib/api'
 import { useTheme } from './ThemeProvider'
 import { useNotifications } from './NotificationProvider'
+import { LoadingIndicator } from '@/components/ui/spinner'
 
-type Studio = { branches: Branch[]; database: string; branch: Branch | undefined; settings: AdminSettings | null; selectBranch: (name: string) => void; reload: () => Promise<void> }
+type Studio = { branches: Branch[]; database: string; branch: Branch | undefined; settings: AdminSettings | null; branchesLoading: boolean; selectBranch: (name: string) => void; reload: () => Promise<void> }
 const Context = createContext<Studio | null>(null)
 export const useStudio = () => {
   const value = useContext(Context)
@@ -24,10 +25,26 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [branches, setBranches] = useState<Branch[]>([])
   const [selected, setSelected] = useState('main')
   const [settings, setSettings] = useState<AdminSettings | null>(null)
+  const [branchesLoading, setBranchesLoading] = useState(true)
+  const reloadVersion = useRef(0)
+  const reloadPending = useRef(0)
   const reload = useCallback(async () => {
-    const [list, preferences] = await Promise.all([api<Branch[]>('/branches'), api<AdminSettings>('/settings')])
-    setBranches(list); setSettings(preferences); setError('')
-    setSelected(current => list.some(b => b.name === current) ? current : 'main')
+    const version = ++reloadVersion.current
+    reloadPending.current += 1
+    setBranchesLoading(true)
+    setError('')
+    try {
+      const [list, preferences] = await Promise.all([api<Branch[]>('/branches'), api<AdminSettings>('/settings')])
+      if (version === reloadVersion.current) {
+        setBranches(list); setSettings(preferences); setError('')
+        setSelected(current => list.some(b => b.name === current) ? current : 'main')
+      }
+    } catch (cause) {
+      if (version === reloadVersion.current) throw cause
+    } finally {
+      reloadPending.current = Math.max(0, reloadPending.current - 1)
+      if (reloadPending.current === 0) setBranchesLoading(false)
+    }
   }, [])
   useEffect(() => {
     fetch('/api/session', { cache: 'no-store' }).then(r => r.json()).then(r => {
@@ -57,7 +74,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
   }
   const branch = branches.find(b => b.name === selected)
-  if (authenticated === null) return <div className="h-screen grid place-items-center bg-studio text-foreground-lighter">Checking Studio session…</div>
+  if (authenticated === null) return <LoadingIndicator label="Checking Studio session" className="min-h-[100dvh] bg-studio" size={28} />
   if (!authenticated) return (
     <div className="h-screen grid place-items-center bg-studio p-6">
       <form onSubmit={login} className="w-full max-w-md rounded-lg border border-default p-8 space-y-5 bg-dash-sidebar">
@@ -71,6 +88,13 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       </form>
     </div>
   )
-  if (!branch) return <div className="h-screen grid place-items-center bg-studio"><div className="max-w-xl space-y-4 p-6"><h1 className="text-xl">Connecting to backend</h1><p role="alert" className="text-foreground-lighter">{error || 'Loading live databases…'}</p><button className="border border-default rounded px-4 py-2" onClick={() => reload().catch(e => setError(errorMessage(e)))}>Retry connection</button></div></div>
-  return <Context.Provider value={{ branches, database: branch.database_name, branch, settings, reload, selectBranch(name) { setSelected(name); localStorage.setItem('sorabase_selected_branch', name) } }}>{children}</Context.Provider>
+  if (!branch) return <div className="grid min-h-[100dvh] place-items-center bg-studio p-6">
+    <div className="max-w-xl space-y-4 text-center">
+      {branchesLoading && <LoadingIndicator label="Loading live databases" size={28} />}
+      {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+      {!branchesLoading && !error && <p className="text-sm text-foreground-lighter">No live databases are available.</p>}
+      {!branchesLoading && <button className="rounded border border-default px-4 py-2 text-sm text-foreground-light" onClick={() => reload().catch(e => setError(errorMessage(e)))}>Retry connection</button>}
+    </div>
+  </div>
+  return <Context.Provider value={{ branches, database: branch.database_name, branch, settings, branchesLoading, reload, selectBranch(name) { setSelected(name); localStorage.setItem('sorabase_selected_branch', name) } }}>{children}</Context.Provider>
 }

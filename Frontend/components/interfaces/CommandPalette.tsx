@@ -14,6 +14,7 @@ import {
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { api, errorMessage } from '@/lib/api'
 import { useStudio } from '@/components/providers/StudioProvider'
+import { Spinner } from '@/components/ui/spinner'
 
 type LiveTable = { schema: string; name: string; estimated_rows: string | number }
 
@@ -199,7 +200,7 @@ export function CommandPalette() {
               </div>
             )}
 
-            {isLoading && <div className="px-2 py-2 text-foreground-lighter">Loading live tables…</div>}
+            {isLoading && <div role="status" className="flex items-center gap-2 px-2 py-2 text-foreground-muted"><Spinner size={16} decorative /><span className="sr-only">Loading live tables</span></div>}
             {loadError && <div role="alert" className="px-2 py-2 text-red-400">{loadError}<button type="button" onClick={() => void loadTables()} className="ml-2 underline">Retry</button></div>}
             {!isLoading && !loadError && search && !navigation.length && !filteredTables.length && !filteredBranches.length && !showSnippetSection && (
               <div className="px-2 py-4 text-center text-xs text-foreground-lighter">No results found matching “{search}”</div>

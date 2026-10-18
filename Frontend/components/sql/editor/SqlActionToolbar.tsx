@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { AlignLeft, Copy, Edit3, Loader2, MoreVertical, Trash2 } from 'lucide-react'
+import { AlignLeft, Copy, Edit3, MoreVertical, Trash2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 
 interface SqlActionToolbarProps {
   isExecuting: boolean
@@ -122,7 +123,7 @@ export function SqlActionToolbar({
           title="Run query (Ctrl+Enter)"
         >
           {isExecuting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner size={14} decorative />
           ) : (
             <span>Run</span>
           )}

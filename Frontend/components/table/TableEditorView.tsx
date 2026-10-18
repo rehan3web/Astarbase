@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { TableTabBar } from './tabs/TableTabBar'
 import { TableNewTabView } from './tabs/TableNewTabView'
 import { NEW_TAB_ID } from './tabs/TableTabBar'
+import { LoadingIndicator, Spinner } from '@/components/ui/spinner'
 import type { RecentTableItem } from './tabs/TableNewTabView'
 import { foreignKeyReferenceSql, type ForeignKeyDraft } from '@/lib/foreign-keys'
 
@@ -253,9 +254,9 @@ export function TableEditorView() {
       <TableTabBar openTabIds={openTabs} activeTabId={activeTab} getTable={lookupTable} isSidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(v => !v)} onSelectTab={activateTab} onCloseTab={closeTab} onNewTab={newTab} onTableAction={(target, action) => void tableAction(target, action as TableAction)} />
       {activeTab === NEW_TAB_ID || !selected ? <TableNewTabView recentItems={recentItems} getTable={lookupTable} onCreateTable={() => setInsertTable(true)} onOpenTable={openTable} /> : table ? <>
          <TableToolbar selectedTable={table} selectedRowIds={selectedRows} filterSearch={filter} onFilterSearchChange={v => { setFilter(v); setSelectedRows(new Set()) }} sortColumn={sortColumn} onSortColumnChange={setSortColumn} sortDirection={direction} onSortDirectionChange={setDirection} onCopyCsv={() => void copySelected('csv')} onCopyJson={() => void copySelected('json')} onCopySql={() => void copySelected('sql')} onExportCsv={() => { try { download(csv(pickedRows), `${table.name}_selected.csv`, 'text/csv'); notify('Selected rows exported as CSV') } catch (e) { notify(errorMessage(e), 'error') } }} onExportJson={() => { try { download(JSON.stringify(pickedRows, null, 2), `${table.name}_selected.json`, 'application/json'); notify('Selected rows exported as JSON') } catch (e) { notify(errorMessage(e), 'error') } }} onDeleteSelected={() => setDeleteRowsOpen(true)} onAddRlsPolicy={() => router.push(`/policies?schema=${encodeURIComponent(table.schema)}&table=${encodeURIComponent(table.name)}`)} onRefresh={() => void refresh(true)} onInsertRow={() => setInsertRow(true)} onInsertColumn={() => { setEditingColumn(null); setColumnValues(blankColumn); setInsertColumn(true) }} />
-        {busy && <div className="px-4 py-1 text-[11px] text-foreground-lighter border-b border-default">Writing changes to Postgres…</div>}
+         {busy && <div role="status" className="flex items-center gap-2 px-4 py-1 text-[11px] text-foreground-lighter border-b border-default"><Spinner size={14} decorative />Writing changes to Postgres…</div>}
         {error && <div role="alert" className="px-4 py-2 text-xs text-red-400 border-b border-default">{error}</div>}
-        {loading ? <div className="p-5 space-y-2">{[0,1,2,3,4].map(i => <div key={i} className="h-8 rounded bg-surface-200/60 animate-pulse" />)}</div> : <>
+         {loading ? <LoadingIndicator label="Loading table data" className="flex-1" size={26} /> : <>
           {!data?.editable && <p className="px-4 py-2 text-xs text-amber-500 border-b border-default">This table has no primary key; safe row edit and delete are unavailable. Inserts remain enabled.</p>}
           <div className="flex-1 min-h-0 overflow-auto">{definition ? <TableDefinitionView selectedTable={table} /> : <TableDataGrid selectedTable={table} displayedRows={rows} selectedRowIds={selectedRows} onToggleSelectAll={() => setSelectedRows(selectedRows.size === rows.length ? new Set() : new Set(rows.map((_, i) => String(i))))} onToggleSelectRow={idx => setSelectedRows(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next })} onInsertColumn={() => setInsertColumn(true)} sortColumn={sortColumn} sortDirection={direction} frozenColumnIds={frozenColumns} onColumnAction={columnAction} onUpdateCell={data?.editable && !busy ? cell : undefined} hideFooter />}</div>
           <TableFooter
@@ -269,7 +270,7 @@ export function TableEditorView() {
             onPageSizeChange={size => { setLimit(size); setOffset(0) }}
             onViewChange={view => setDefinition(view === 'definition')}
           />
-        </>}</> : loading ? <div className="p-5 space-y-2">{[0,1,2,3,4].map(i => <div key={i} className="h-8 rounded bg-surface-200/60 animate-pulse" />)}</div> : error ? <div role="alert" className="m-5 rounded border border-destructive/30 p-4 text-sm text-red-400">{error}<button onClick={() => void loadTables().catch(e => setError(errorMessage(e)))} className="ml-3 underline">Retry</button></div> : <div className="p-10 text-sm text-foreground-lighter">{tables.length ? 'Select a table from the explorer or open a new tab.' : 'No tables in this schema. Create a table or use the SQL editor.'}</div>}
+        </>}</> : loading ? <LoadingIndicator label="Loading tables" className="flex-1" size={26} /> : error ? <div role="alert" className="m-5 rounded border border-destructive/30 p-4 text-sm text-red-400">{error}<button onClick={() => void loadTables().catch(e => setError(errorMessage(e)))} className="ml-3 underline">Retry</button></div> : <div className="p-10 text-sm text-foreground-lighter">{tables.length ? 'Select a table from the explorer or open a new tab.' : 'No tables in this schema. Create a table or use the SQL editor.'}</div>}
     </section>
     <InsertTableModal open={insertTable} onOpenChange={setInsertTable} schemaName={schema} onInsertTable={async t => {
       const ok = await mutate(async () => { await sql(`BEGIN; ${createTableSql(t)} COMMIT;`); await loadTables(); openTable(t); setOffset(0) }, 'Table created')

@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'default' | 'secondary' | 'outline' | 'dashed' | 'destructive' | 'ghost' | 'link' | 'warning'
@@ -125,7 +125,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+          <Spinner size={14} decorative className="text-foreground-muted" />
         ) : (
           iconLeft && (
             <div
