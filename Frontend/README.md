@@ -1,53 +1,58 @@
-# Sorabase Studio frontend
+# Sorabase Studio
 
-The Next.js UI is connected to the backend; it has no mock database fallback.
-Run the full stack from the repository root using the instructions in `../README.md`.
+The Next.js frontend for Sorabase: a live PostgreSQL management interface, not a mock-data dashboard.
 
-## Features
+For the complete introduction, infrastructure diagram, and Docker installation, see the [main README](../README.md).
 
-- Shared live branch selection for SQL, tables, ERD and backups.
-- SQL execution with CSV results, real errors, timing and complete raw output.
-- Paginated table reads, cell updates, inserts, deletes and schema DDL through SQL.
-- Branch creation and explicitly confirmed parent refresh.
-- Backup creation, live Docker file availability and explicitly confirmed restore.
-- SQLite-backed admin settings.
+## Interface
 
-Unknown/unsupported schema-menu actions direct you to SQL instead of reporting a
-fake success. Charts are disabled rather than displaying sample graphs. The plain
-SQL editor works without a CDN; Monaco is optional.
+- Dashboard with real database metrics and PostgreSQL, RLS, and PgBouncer status.
+- Table Editor with record editing, filtering, pagination, structure controls, and read-only SQL definitions.
+- SQL Editor with persisted query organization and JSON, CSV, and Markdown exports.
+- Database branches, tags, parent pulls, and confirmed child deletion.
+- Schema Visualizer with real foreign-key relationships and schema SQL export.
+- PostgreSQL row-level security policy management.
+- Connection snippets with masked passwords and explicit copy/reveal actions.
+- Database settings and **Settings → Backups**.
 
-## Security and transport
+The active database is shared across relevant screens through the header selector. Selecting a row in the Branches list selects its actions; it does not switch the active database.
 
-Sign in using the admin token configured on your own server. It is exchanged for
-an eight-hour signed HttpOnly session; it is not persisted in localStorage.
-`app/api/studio/[...path]/route.ts` validates that session, checks mutation origins,
-and injects the server-only token into requests sent over the shared Admin API
-Unix socket. No Postgres password or Docker socket is mounted into the frontend.
-There is no HTTP/TCP or dummy-data fallback for backend requests.
+## Authentication and backend access
 
-Compose supplies `ADMIN_API_TOKEN` from the root `.env` (or legacy `Backend/.env`)
-and sets `ADMIN_SOCKET_PATH` automatically. Start everything with just
-`docker compose up --build -d --wait` after configuring `.env`; no host Node.js,
-pnpm or manual DB push is needed. Backups lives under **Settings → Backups** only.
-For standalone frontend development, `pnpm dev:studio` from the
-repository root serves port 5000. Supply frontend environment values securely
-(see `.env.example`) and arrange access to the same local Admin Unix socket. If
-not configured, the UI reports that fact; if the socket is absent, it reports the
-backend is unavailable.
+Sign in with an admin **username or email and password**. There is no token-login UI.
+
+The browser receives a signed HttpOnly session cookie. Server routes validate the session and mutation origins before calling the backend over the shared Admin API Unix socket. The private `ADMIN_API_TOKEN` authenticates server-to-server requests; it is not a user login or a browser-exposed credential.
+
+The frontend does not mount the Docker socket or PostgreSQL password. Missing backend configuration and unavailable services produce explicit errors, not sample data.
+
+## Run
+
+Recommended: configure the root `.env` and run the complete stack from the repository root:
+
+```bash
+docker compose up --build -d --wait
+```
+
+For source development, install Node.js 24+ and pnpm 10.26.1, then run from the repository root:
+
+```bash
+pnpm install
+pnpm dev:studio
+```
+
+The development server listens on `0.0.0.0:5000`. Configure private frontend environment values using [`.env.example`](.env.example) and provide access to the real backend Unix socket. Frontend development alone does not start PostgreSQL or the admin backend.
 
 ## Checks
 
-```sh
+Run from the repository root:
+
+```bash
 pnpm --filter studio typecheck
 pnpm --filter studio test
 pnpm --filter studio build
 pnpm --filter studio test:integration
 ```
 
-The browser integration test requires local PostgreSQL binaries and Chromium
-(`CHROMIUM_PATH` overrides its executable path). Build first. It starts isolated
-real Postgres, the real backend API on a temporary Unix socket, and production
-Next.js on port 5100. It tests normal sign-in, SQL results/errors, table editing,
-ERD, branch isolation, backups/restores, parent refresh, settings and sign-out.
-It uses a **test-only** local adapter for Docker commands, not a production
-fallback. Full Docker/PgBouncer startup still requires a Docker-enabled host.
+Browser integration checks require local PostgreSQL binaries and Chromium. Set `CHROMIUM_PATH` if needed. Build first: the suite starts production Next.js on port 5100, isolated real PostgreSQL, and the real API through a temporary Unix socket.
+
+The fixture uses a test-only local adapter for Docker commands. It does not validate production Docker images, PgBouncer startup, network exposure, or firewall rules.

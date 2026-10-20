@@ -1,11 +1,13 @@
-# Styles
+# Studio styles
 
-## When to write custom styles
+Sorabase Studio uses Tailwind CSS for component styling. Prefer existing theme tokens and utility classes to keep light and dark modes consistent.
 
-Tailwind should be sufficient to cover the majority of styling needs. We typically only write custom styles here in the event where we're working with an external library and we need to override some styles (e.g Monaco, or even our own UI library).
+## Guidelines
 
-Ideally, keep custom styling here to a minimum, use tailwind directly in the pages and components where possible, so that we have less code to maintain.
+- Keep styles close to the component whenever Tailwind utilities are sufficient.
+- Use custom stylesheets for third-party integration overrides or styles that utilities cannot express clearly.
+- Group overrides by the component or integration they affect.
+- Preserve visible keyboard focus, readable contrast, and existing responsive behavior.
+- Avoid global overrides that unintentionally change dialogs, dropdowns, tables, or the SQL editor.
 
-## If you're writing custom styles
-
-Group custom styles into separate stylesheets based on their context. For styles which are generic and global, we can write them in `main.scss`.
+For setup and frontend checks, see the [frontend guide](../README.md). For installation and architecture, see the [main project README](../../README.md).

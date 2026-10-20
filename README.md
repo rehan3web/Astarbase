@@ -1,353 +1,355 @@
-# Sorabase
+<div align="center">
+  <img src="Frontend/public/sorabase-logo.png" alt="Sorabase logo" width="100" height="100" />
+  <h1>Sorabase</h1>
+  <p><strong>Your PostgreSQL. Your infrastructure. One Studio.</strong></p>
+  <p>A modern, self-hosted PostgreSQL management platform inspired by Supabase and Neon.</p>
+  <p>
+    <a href="#features">Features</a> ·
+    <a href="#infrastructure">Infrastructure</a> ·
+    <a href="#installation">Installation</a> ·
+    <a href="#security">Security</a> ·
+    <a href="#contributing">Contributing</a>
+  </p>
+  <p>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0" /></a>
+    <img src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL 17" />
+    <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Self--hosted-Docker-2496ED?logo=docker&logoColor=white" alt="Self-hosted with Docker" />
+  </p>
+</div>
 
-## Fresh installation
+---
 
-This project targets a fresh Sorabase installation. Copy `.env.example` to `.env`
-and supply your own strong credentials before running `docker compose up -d --build`.
-The default database is `sorabase`, the Unix-only admin role is `sorabase_admin`,
-and the public main-database client role is `sorabase_main`.
+## Introduction
 
-Docker uses the `sorabase` Compose project, `sorabase-postgres` container and
-Sorabase-prefixed network/volumes. Internal roles and pooler authentication use
-`sorabase_client_roles` and `sorabase_pool_auth`. No previous product-name
-compatibility is required. The optional control-catalog import defaults to
-`sorabase_control`.
+Sorabase is a modern, self-hosted PostgreSQL management platform inspired by Supabase and Neon. It provides a powerful, developer-friendly environment to manage databases, explore tables, run SQL, create database branches, configure row-level security, and maintain backups from one web-based Studio.
 
-Removing old installations, images, bind-mounted data or volumes is a separate
-destructive operation: back up anything you need before deleting it. This code
-does not delete another installation automatically.
+Run the complete stack on your own Linux machine using Docker Compose. Your application data stays in PostgreSQL, while Studio metadata stays in a local SQLite database.
 
-Single-machine Admin Studio with a connected Next.js frontend, Node.js/TypeScript
-backend, Postgres, PgBouncer, and SQLite admin settings.
+**Sorabase is an independent project, not affiliated with Supabase or Neon.** It is a PostgreSQL management platform—not a replacement for every service those platforms provide.
 
-The SQL Editor saves named snippets, SQL text, folders, favorites and
-Private/Shared organization in the existing `Backend/data/admin.sqlite`.
-Use **Save** (or Ctrl+S) to persist editor changes. New snippets and folders,
-renames, favorites and visibility changes survive reloads and container
-restarts through the existing admin-data volume. Deleting a folder keeps its
-queries outside the folder. Private and Shared are authenticated Studio library
-groups for this single-admin installation; Shared never means anonymous access.
-Saving a snippet does not execute it; use **Run** separately.
+## Features
 
-### Dashboard metrics and retained history
+| Feature | What you can do |
+| --- | --- |
+| **Database dashboard** | Monitor database size, connections, activity, and Postgres-container CPU and RAM using real backend readings. |
+| **Service status** | See live PostgreSQL Engine, Row Level Security, and PgBouncer status for your environment. |
+| **Table Editor** | Browse records, search/filter rows, edit cells, insert and delete records, and manage table structure. |
+| **SQL definitions** | Inspect read-only, highlighted table DDL with line numbers and open it as a draft in the SQL Editor. |
+| **SQL Editor** | Execute SQL, inspect results and errors, and organize saved queries with folders, favorites, and Private/Shared groups. |
+| **Result exports** | Copy query results as JSON, CSV, or Markdown, or download CSV. |
+| **Database branches** | Create independent databases from main or another branch, edit tags, pull from a parent, and delete child branches. |
+| **Schema Visualizer** | Explore tables and foreign-key relationships, and export the selected database's schema as SQL. |
+| **Row-level security** | View and manage real PostgreSQL policies, target roles, commands, predicates, and RLS/FORCE settings. |
+| **Backups and restore** | Create saved snapshots, restore them with confirmation, download snapshot SQL, and delete old backups. |
+| **Client connections** | Get direct PostgreSQL or transaction-pooler connection details, with masked passwords and explicit copy/reveal controls. |
+| **Database settings** | Reset a selected database's client password, terminate its client connections, or reset its contents with confirmation. |
+| **PgBouncer controls** | Configure the shared pool size from main; the global client limit is fixed at 200. |
+| **Admin sign-in** | Use an admin username or email and password, with server-managed HttpOnly sessions. |
 
-Database size, selected-database connections and transaction/row-change activity
-come from PostgreSQL over its shared Unix socket. CPU and working-set RAM come
-from the **Postgres container**, using dockerode over `/var/run/docker.sock`;
-these are shared across all branches, not per-branch CPU/RAM or whole-VPS usage.
-Docker CPU uses counter deltas; 100% means one CPU core, so values can exceed 100%.
-Connection limits are cluster-wide. Memory usage excludes inactive file cache.
+### How branches work
 
-The backend samples managed databases every 30 seconds even with the dashboard
-closed. Numeric readings and query/branch-refresh event metadata persist in
-`Backend/data/admin.sqlite` for 7 days, including across container restarts.
-The dashboard offers 1h/24h/7d history and periodic refresh. Time buckets select
-actual samples; gaps are never filled with invented data. Transaction rates
-require two samples and reset their baseline when Postgres counters reset or a
-database is recreated. Transactions are not SQL statement counts.
+Each branch is a separate database inside the **same PostgreSQL instance**, with its own client credentials. Branches isolate database contents, not compute resources.
 
-`GET /api/databases/:database/metrics?hours=24&limit=240` is authenticated.
-`hours` accepts 1–168 and `limit` 1–720. Errors mark partial/stale readings rather
-than producing fake zeros; old readings remain available within retention.
-Activity events store only kind, time, duration and success/error—not SQL text,
-credentials or query results. Saving an editor snippet is not a query event.
-Metrics from before this feature was installed cannot be reconstructed.
+- Create a branch from main or another branch.
+- Use the Studio header selector to change the active database.
+- Main's actions menu contains **Rename tag** only.
+- Child branches expose **Edit tag**, **Pull / refresh**, and **Delete branch**.
+- Only the selected branch-list row shows its actions button.
+- Pulling replaces the child's contents with its parent's snapshot. It is **not a merge** and can disconnect target clients.
 
-The activity chart retains the original backup UI's striped stacked bars,
-hover details and Runs/Rows switch. Runs aggregate all recorded Studio SQL and
-branch-refresh events in the selected period (not just the latest event list):
-successful operations under 1 second, slow successful operations, and failures.
-Rows show observed insert/update/delete counter deltas, assigned to the bucket
-in which each sample interval ends. Counter resets, recreated databases, missing
-baselines and sampling gaps over 90 seconds are not treated as valid row activity.
-Unobserved buckets remain empty rather than displaying fabricated activity.
-The dashboard does not display the detailed telemetry tables or range controls;
-readings and activity remain available in the API and retained in SQLite.
-The chart starts with one left-aligned hourly column at the first recording,
-adds a column each elapsed hour, and rolls at 24 columns. Its start time is
-persisted per database in SQLite, so restarting the app or pruning old readings
-does not reset the chart or insert blank columns before recording began.
+Branch creation uses PostgreSQL dump/restore operations; it is not storage-level copy-on-write or serverless branching.
 
-### External client connections
+## Infrastructure
 
-The header **Connect** link opens `/connect` with Connection String,
-Transaction Pooler, PSQL, and Parameters tabs for the selected branch.
-Metadata uses the selected database's separate client role, branch database name, and public
-Postgres/PgBouncer ports. Set `DATABASE_PUBLIC_HOST` to a public DNS name/IP
-when clients need a different host from the Studio browser address; otherwise
-the page uses the actual browser hostname for this same-machine deployment.
-Compose forwards `POSTGRES_PUBLIC_PORT` and `PGBOUNCER_PUBLIC_PORT` to Studio,
-so custom port mappings appear in the generated client strings.
+All services run on **one Docker host** and one Compose network. Browser traffic and external database-client traffic are separate from privileged admin operations.
 
-Passwords are masked by default, never included in metadata reads, and only
-returned by an authenticated, same-origin POST after **Show password** is
-clicked, or transiently for an explicit **Copy snippet** action. Hide, tab changes, branch changes, and navigation clear the revealed
-password from the view. Credentials are not saved in SQLite/browser storage.
-The password is masked directly inside the snippet, not in a separate field.
-**Copy snippet** and **Show password / Hide password** share the snippet footer.
-Copy produces a usable connection string including the real password without
-revealing it onscreen; copying credentials requires an explicit button click.
-Parameters displays shell-compatible `PG*` environment assignments in one
-editor. Default Compose connections do not enable TLS: use a trusted network
-or a secure tunnel. These are external client examples, not an Admin Studio
-TCP connection; admin operations remain on shared kernel Unix sockets.
+```mermaid
+flowchart TB
+    browser["Admin browser"]
+    client["External application / SQL client"]
 
-### Row level security policies
+    subgraph host["Your Linux host · Docker Compose"]
+        frontend["Sorabase Studio · Next.js / React<br/>Public port 5000"]
+        api["Admin backend · Node.js / TypeScript<br/>Diagnostic HTTP: host loopback only"]
+        pooler["PgBouncer<br/>Public port 6432 · transaction pooling"]
+        postgres["PostgreSQL 17<br/>Public port 5432<br/>Main + branch databases"]
+        docker["Docker Engine<br/>Local container operations and stats"]
+        metadata[("SQLite + encrypted credential files<br/>Backend/data")]
+        backups[("Saved dump archives<br/>Backend/backups")]
+        pgdata[("Persistent PostgreSQL volume")]
+    end
 
-The Policies page lists actual PostgreSQL policies for the selected database and
-table, rather than table columns. Create, edit (including rename, command and
-mode), or delete policies; select multiple target roles and supply `USING` /
-`WITH CHECK` PostgreSQL expressions. Supported commands are ALL, SELECT, INSERT,
-UPDATE and DELETE; modes are PERMISSIVE and RESTRICTIVE. Table-editor policy
-links open the corresponding table. All changes persist in the selected
-Postgres database, not SQLite, and do not alter other branches.
+    browser -->|"HTTPS reverse proxy recommended"| frontend
+    frontend -->|"Private shared admin Unix socket"| api
+    api -->|"Private PostgreSQL Unix socket"| postgres
+    api -->|"Private Docker Unix socket"| docker
+    docker -->|"Dump / restore inside Postgres container"| postgres
+    api --> metadata
+    postgres --> backups
+    postgres --> pgdata
+    client -->|"Database-specific client credentials"| postgres
+    client -->|"Database-specific client credentials"| pooler
+    pooler -->|"PostgreSQL Unix socket"| postgres
+```
 
-Enable/disable RLS, FORCE/remove FORCE and deletion require confirmation.
-Policy replacement is transactional: invalid SQL or missing roles leave the
-original policy intact. Definitions can be saved while RLS is disabled.
-Enabling RLS without applicable policies denies ordinary clients row access.
-Policies restrict access but do not grant table/schema privileges.
-Permissive policies combine with OR; restrictive policies combine with AND and
-require an applicable permissive policy. Omitted predicates follow PostgreSQL
-defaults, including WITH CHECK inheriting USING for ALL/UPDATE.
+### Technology stack
 
-**Important:** Studio's internal superuser and other SUPERUSER/BYPASSRLS roles
-always bypass RLS, including FORCE. Ordinary table owners bypass it unless FORCE
-is enabled. Verify row access with your database's non-superuser client login,
-not the Studio SQL editor. Application-user identity functions/session context
-are application-managed; Studio does not provision Supabase-style `auth.uid()`
-or interpret an application login as a PostgreSQL role.
+| Layer | Technology |
+| --- | --- |
+| Studio | Next.js 16, React 19, TypeScript, Tailwind CSS, Radix UI |
+| SQL editing and diagrams | Monaco integration, React Flow, Dagre |
+| Backend | Node.js 24+, TypeScript, Express, node-postgres, dockerode |
+| Application databases | PostgreSQL 17 |
+| Connection pooling | PgBouncer with wildcard database routing |
+| Studio metadata | SQLite |
+| Deployment | Docker Engine and Docker Compose v2 |
 
-### Database credentials and pool settings
+### Storage and persistence
 
-Studio preferences are no longer shown in Database Settings. Each new branch,
-including a child branch, gets a non-superuser login with the branch name and a
-cryptographically random password. New installations use the separate `sorabase_main`
-client login. Internal admin operations keep using `DB_USER` / `DB_PASSWORD`;
-Settings never rotates that internal credential.
+| Location | Contents |
+| --- | --- |
+| `postgres-data` Docker volume | Main and branch database contents |
+| `Backend/data/` | Admin account/settings, query library, branch/backup inventory, telemetry, and encrypted client-credential files |
+| `Backend/backups/` | Saved PostgreSQL backup archives |
+| `pooler-config` Docker volume | Persistent PgBouncer configuration |
 
-On upgrade, Studio provisions separate credentials for existing managed
-databases without deleting data. **The internal `DB_USER` role is Unix-only**:
-both public Postgres and PgBouncer reject it over IPv4 and IPv6, including the
-public PgBouncer admin console. Studio can still manage main, branches and
-children through the shared Unix socket; PgBouncer can still use its internal
-Unix authentication and console connections. The internal password is not
-rotated by a client password reset.
+Application rows stay in PostgreSQL. Client passwords are encrypted in private files, not stored in SQLite or browser storage. Preserve the encrypted files **and their `client-credentials.key` together** when backing up Studio metadata.
 
-**Upgrade:** migrate external applications using `DB_USER` to their database's
-new Connect snippet, then run `docker compose up -d --build` from the project
-directory. The updated Postgres mount/configuration and rebuilt PgBouncer apply
-the policy to both new and existing volumes. Recreating these containers
-disconnects existing sessions. Do not remove volumes or change `.env`
-credentials just to apply this policy. Until this update is installed on the
-VPS, an older installation can still accept the old public admin login.
-The Postgres guard includes the original `pg_hba.conf` after the admin-specific
-rules, preserving client rules and relative includes without rewriting that file.
+## Installation
 
-Managed databases have public CONNECT revoked so a branch client cannot connect
-to another managed database. Branch refresh/backup restore strips source ACLs
-and reapplies the destination client's access; its password stays unchanged.
-Existing roles with conflicting names are rejected, never adopted or reset.
+### Requirements
 
-In Settings, **Reset database password** opens a password-entry dialog for the
-selected main, branch or child database only. Enter your own 16–256-character
-password, or use **Generate a password** to fill an optional secure random value;
-you can edit it before saving. Random initial passwords are still assigned
-automatically when branches are created. Get the saved password using
-**Connect → Show password** and update external clients.
-Already-authenticated sessions can remain connected. PgBouncer uses a restricted
-Postgres SCRAM authentication query, so new branch users and password changes
-do not require editing a user list or restarting the pooler.
+- A Linux machine with local Docker Engine and **Docker Compose v2**.
+- Docker available at `/var/run/docker.sock`.
+- Git to clone the repository.
+- Available ports: `5000` for Studio, `5432` for PostgreSQL, and `6432` for PgBouncer, unless customized.
 
-Client credentials are encrypted with AES-256-GCM in private files under
-`Backend/data`, not in SQLite or browser storage. Back up the encrypted files
-**and** their `client-credentials.key` together, securely; losing them prevents
-Studio from recovering client passwords. Filesystem access to both can decrypt
-the passwords. Preserve the existing admin-data directory when upgrading.
+No host Node.js, pnpm installation, manual schema push, or separate frontend/backend startup is required for Docker installation.
 
-Only main displays the shared PgBouncer pool settings. Pool size accepts 1–80
-server connections per user/database pair and reloads dynamically. It persists
-in the `pooler-config` Docker volume across restarts. PgBouncer caps each
-database/user at 80 server connections; overall Postgres capacity still applies.
-**Max client connections is fixed at 200 across the entire pooler**, not 200
-per branch, and is not writable through the API.
+### 1. Clone the repository
 
-### Reset a database or terminate its client connections
-
-Database Settings shows **Additional → Terminate connections** above Danger Zone,
-and **Reset database** instead of database deletion. Both actions open a warning
-dialog and require explicit confirmation. They apply to the selected main,
-branch or child database only.
-
-**Reset database** permanently clears all application schemas/data, including
-custom tables, functions, extensions and large objects, by swapping in an empty
-`template0` database. It does not pull data from a parent. Existing sessions to the
-selected database must reconnect. Its name, branch metadata, client login/password
-and saved backup archives remain; other databases are untouched. Create a backup
-first if the data must be recoverable. If staging fails, the original stays in place.
-
-**Terminate connections** closes that database's PgBouncer client/server sessions
-and direct TCP Postgres client sessions, rolling back their active transactions.
-It preserves direct Unix admin sessions, background workers and connections to
-other databases. Clients can reconnect automatically with unchanged credentials.
-PgBouncer is resumed after maintenance, including after failed reset/termination.
-
-The pooler admin console is accessed only through its container's Unix socket,
-using the existing internal admin login. Rebuild the PgBouncer image alongside
-Studio on upgrade so the admin-console allowlist is present. A pooler-control
-failure returns an error rather than pretending all connections were terminated.
-
-Upgrade all images together with `docker compose up -d --build` using your
-existing `.env` and volumes. Do not use `down -v`. This upgrade requires a
-privileged existing internal `DB_USER` to manage roles and the private pooler
-authentication function; no new privileged admin roles are created.
-
-Backend and PgBouncer startup logic use Node.js 24 + TypeScript. No Python
-interpreter, scripts or dependencies are required by the Docker stack.
-
-## Run and test on your Docker host
-
-Requirements: Linux, local Docker Engine at `/var/run/docker.sock` and Docker
-Compose v2. Use the local Docker context. **Host Node.js, pnpm, DB-push commands
-and separate frontend/backend startup commands are not required.**
-
-```sh
+```bash
+git clone https://github.com/rehan3web/Astarbase.git
+cd Astarbase
 cp .env.example .env
-# Fill DB_NAME, DB_USER, DB_PASSWORD, ADMIN_API_TOKEN,
-# ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD and SESSION_SECRET locally.
-# DB_PASSWORD: at least 16 characters. ADMIN_API_TOKEN: at least 32 characters.
+```
+
+The repository folder is named `Astarbase`; the application and default Docker resources are named **Sorabase**.
+
+### 2. Configure your environment
+
+Edit the root `.env` locally before starting the stack:
+
+| Variable | Purpose |
+| --- | --- |
+| `DB_NAME` | Main database name; default example: `sorabase`. |
+| `DB_USER` | Internal Unix-only admin role; default example: `sorabase_admin`. |
+| `DB_PASSWORD` | Strong internal database password, at least 16 characters. |
+| `ADMIN_API_TOKEN` | Private server-to-server secret, at least 32 characters. **Not a Studio login.** |
+| `SESSION_SECRET` | Independent cookie-signing secret, at least 32 characters. Must differ from `ADMIN_API_TOKEN`. |
+| `ADMIN_USERNAME` | First-run admin username, 3–48 characters using letters, numbers, `.`, `_`, or `-`. |
+| `ADMIN_EMAIL` | Valid email address for the first-run admin account. |
+| `ADMIN_PASSWORD` | First-run admin password, 12–256 characters. |
+
+Generate a **different** random value for each secret, for example with `openssl rand -hex 32`. Never commit your `.env` or share its contents. Single-quote values containing `$` or `#`.
+
+Optional settings:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `STUDIO_PORT` | `5000` | Public Studio port. |
+| `POSTGRES_PUBLIC_PORT` | `5432` | Direct database-client port. |
+| `PGBOUNCER_PUBLIC_PORT` | `6432` | Pooled database-client port. |
+| `DATABASE_PUBLIC_HOST` | Browser hostname | Public DNS name/IP used in connection snippets. |
+| `ADMIN_PORT` | `8000` | Host-loopback diagnostic API port; not a public API. |
+| `STUDIO_COOKIE_SECURE` | `false` | Set `true` when Studio is served through HTTPS. |
+| `SQL_TIMEOUT_MS` | `30000` | SQL execution timeout. |
+
+See [`.env.example`](.env.example) for the complete configuration template.
+
+### 3. Start Sorabase
+
+```bash
+docker compose up --build -d --wait
+docker compose ps
+```
+
+Compose builds the services, starts PostgreSQL and PgBouncer, initializes Studio metadata, checks database access, and starts the frontend after backend healthchecks pass.
+
+### 4. Open Studio
+
+Visit **`http://YOUR_SERVER_IP:5000`**, or `http://127.0.0.1:5000` on the Docker host. Use your configured `STUDIO_PORT` if different.
+
+Sign in with your **admin username or email and password**. There is no default password or public signup. Bootstrap account variables only create the first account; changing them later does not reset an existing login. After successful first-run setup, `ADMIN_PASSWORD` may be removed from `.env`.
+
+> Before exposing Studio to the Internet, configure HTTPS and firewall rules. The default Compose database ports are publicly bound; restrict access to trusted client networks.
+
+## Quick start
+
+1. Open **SQL Editor**, select main, and run:
+
+   ```sql
+   CREATE TABLE public.notes (
+     id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+     title text NOT NULL,
+     created_at timestamptz NOT NULL DEFAULT now()
+   );
+
+   INSERT INTO public.notes (title) VALUES ('Hello from Sorabase');
+   SELECT * FROM public.notes;
+   ```
+
+2. Open **Table Editor** to browse and edit `notes`. Use **Definition** to inspect its SQL.
+3. Create a `dev` branch and select it from the header. Changes there do not change main.
+4. Open **Schema Visualizer** to inspect tables and relationships.
+5. Open **Settings → Backups** to save a snapshot before destructive work.
+6. Use **Connect** to obtain the active database's direct or pooled client credentials.
+
+## Monitoring
+
+- Database size, connections, and row/transaction activity come from PostgreSQL.
+- CPU and RAM describe the **shared Postgres container**, not per-branch usage or the entire VPS.
+- CPU usage can exceed 100% because 100% represents one CPU core.
+- The backend samples managed databases every 30 seconds and retains telemetry for seven days.
+- Activity charts use recorded events and observed row-counter changes, not generated sample data.
+- RLS status is Active when at least one user table in the selected database has RLS enabled. It is not proof that every table is protected.
+
+Unavailable readings are reported as unavailable rather than replaced with fabricated values.
+
+## Backups and maintenance
+
+Backups live under **Settings → Backups**. Saved custom-format PostgreSQL archives support restore and branch copying; downloadable `.sql` files are converted from the **saved snapshot**, not the current database.
+
+Restore, pull/refresh, database reset, and deletion can replace or remove data. Read the confirmation carefully and create a backup first.
+
+Useful host commands:
+
+```bash
+# Service status
+docker compose ps
+
+# Recent application logs
+docker compose logs --tail=100 studio frontend
+
+# Database and pooler logs
+docker compose logs --tail=100 postgres pgbouncer
+
+# Stop without removing persistent volumes
+docker compose stop
+
+# Restart existing services
+docker compose start
+```
+
+### Updating
+
+Back up your databases, `Backend/data/`, `Backend/backups/`, and your private environment configuration before upgrading.
+
+```bash
+git pull --ff-only origin main
 docker compose up --build -d --wait
 ```
 
-Compose automatically reads the root `.env`, builds both Node.js images, starts
-Postgres and wildcard PgBouncer, initializes the admin SQLite metadata and checks
-the project database with those credentials, opens the shared Admin API socket,
-and then starts the frontend. Healthchecks enforce this order. Existing database
-volumes, settings and backups are preserved on subsequent runs.
+Keep your existing `.env`, bind-mounted directories, and Docker volumes. Rebuilding can interrupt connections.
 
-If you already configured the previous `Backend/.env`, keep it and instead run:
+**Do not use `docker compose down -v` unless you intend to delete persistent volumes.** Changing `DB_USER` or `DB_PASSWORD` in `.env` does not automatically rotate credentials inside an existing PostgreSQL volume.
 
-```sh
-docker compose --env-file Backend/.env up --build -d --wait
-```
+### Forgotten internal database password
 
-Use `docker compose ps` and `docker compose logs studio frontend` to inspect
-startup. For the legacy command, also pass `--env-file Backend/.env` to those
-commands. Do not use `down -v` unless you intend to delete database volumes.
+This is an explicit maintenance operation with downtime, not an automatic startup reset. It changes the configured internal `DB_USER` password without deleting application data.
 
-1. Open **http://YOUR_VPS_IP:5000** remotely, or **http://127.0.0.1:5000**
-   on the Docker host (use your configured `STUDIO_PORT` if different).
-2. Sign in with your **admin username or email and password**. On first startup,
-   `ADMIN_USERNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` (or legacy
-   `Backend/.env`) create the admin account. Use a 3–48-character username,
-   a valid email and a 12–256-character password. There is no default password
-   or public registration. Only a salted scrypt password hash is saved in
-   `Backend/data/admin.sqlite`; the browser receives an HttpOnly session cookie.
-   Existing accounts are never overwritten on restart, so changing these
-   bootstrap variables later does not reset the account. After initial setup
-   you may remove `ADMIN_PASSWORD` from `.env`.
-   Set a **new `SESSION_SECRET` of at least 32 characters**, different from the
-   old login token, for private cookie signing. Never reuse `ADMIN_API_TOKEN`
-   as `SESSION_SECRET`: old token holders must not be able to forge sessions.
-   `ADMIN_API_TOKEN` remains a private server-to-server secret;
-   it is not accepted as a Studio login. Existing token-login sessions must
-   sign in again after this update.
-3. Open SQL and run the following on `main`:
+Set the desired `DB_PASSWORD` in your private `.env`, then:
 
-   ```sql
-   CREATE TABLE public.studio_test (
-     id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-     name text NOT NULL
-   );
-   INSERT INTO public.studio_test(name) VALUES ('first live row');
-   SELECT * FROM public.studio_test;
-   ```
-
-4. In Table Editor, select `studio_test`, edit a cell, refresh, and verify the
-   persisted value. Test insert/delete and pagination.
-5. Create `dev` from `main` in Branches. Select `dev` using the header selector;
-   it maps to database `branch_dev`. Changes there do not modify main. The
-   Storage column reads each database's actual `pg_database_size`, not a sample
-   or a shared Docker volume total.
-6. Open Schema Visualizer to inspect live tables and foreign keys. **Copy as SQL**
-   exports the active database's complete schema using Docker `pg_dump
-   --schema-only`, including all user schemas, table definitions, identity
-   columns, defaults, indexes and constraints, without row data. Graph schema
-   selection does not restrict this SQL export. Copy supports HTTP deployments
-   where the browser Clipboard API is unavailable.
-7. Open **Settings → Backups**, create a backup on dev, modify dev's data, and
-   restore the archive. Backups is not a main-sidebar item. Restore
-   requires typing the exact target database name. Archives appear in
-   `Backend/backups/` as real Docker `pg_dump` files. The backup actions menu
-   downloads a plain `.sql` conversion of the saved snapshot using Docker
-   `pg_restore`; it does not dump the current live database. Delete backup
-   requires typing its exact backup ID and permanently removes the archive and
-   SQLite metadata without changing the live database. Missing archives cannot
-   be downloaded, but their stale metadata can still be deleted.
-8. Pull/refresh dev from main when wanted. This **replaces dev's contents**, not a
-   merge, and requires typing `branch_dev`. Target database clients disconnect.
-9. Save Admin Settings and reload. Settings persist in
-   `Backend/data/admin.sqlite`; actual user data stays in Postgres.
-
-PgBouncer's wildcard database mapping routes every new branch without manual
-entries or a reload. External clients use the Docker host on the configured
-Postgres/PgBouncer public ports (defaults 5432/6432).
-
-## Security
-
-Studio's frontend is publicly bound to `0.0.0.0` (port 5000 by default), as requested.
-The diagnostic API remains bound to the Docker host's loopback.
-Restrict the Studio port to trusted IPs with host/provider firewall rules and use
-a trusted HTTPS reverse proxy before sending credentials over the Internet. Enable
-`STUDIO_COOKIE_SECURE=true` for HTTPS. Database ports are public as requested:
-restrict host firewall rules and configure external TLS before Internet use.
-The admin token permits arbitrary SQL and powerful Docker operations; protect it.
-
-Browser → Next.js uses the Studio web session. Next.js → Admin API uses the shared
-Admin Unix socket. Admin API → Postgres and Docker use kernel Unix sockets only.
-There are no remote-database, TCP-admin, or mock-data fallbacks.
-
-## Recover a forgotten database password without deleting data
-
-Use this only when the original password is unavailable and startup reports
-Postgres authentication error `28P01`. Set the desired password in your own `.env`
-(`DB_PASSWORD`, at least 16 characters); do not paste it into chat or CLI arguments.
-This changes the existing `DB_USER` role password cluster-wide. Existing external
-clients must update their password. There will be maintenance downtime.
-
-```sh
-git pull origin main
+```bash
 docker compose build studio
 docker compose stop -t 60 frontend studio pgbouncer postgres
-docker compose run --rm --no-deps studio node dist/src/maintenance/reset-password.js --confirm-user sorabase_admin
-# Only after "Password reset confirmed":
+docker compose run --rm --no-deps studio \
+  node dist/src/maintenance/reset-password.js --confirm-user sorabase_admin
+# Continue only after the command reports "Password reset confirmed".
 docker compose up -d --wait
 ```
 
-Replace `sorabase_admin` with your configured `DB_USER` if different. With legacy
-`Backend/.env`, pass `--env-file Backend/.env` to every Compose command.
-The recovery command refuses a running Postgres server, reuses the exact same
-Postgres image/data mount, runs standalone maintenance with networking disabled,
-sends SQL only over private stdin, and suppresses raw SQL/Docker logs.
-It does not initialize a new database, delete volumes, create roles, change role
-privileges, or weaken `pg_hba.conf`. If it fails, keep Postgres stopped and inspect
-the stated maintenance error; do not delete lock files or volumes.
+Replace `sorabase_admin` with your configured `DB_USER`. If recovery fails, keep PostgreSQL stopped and inspect the error; do not delete lock files or volumes. This command does **not** reset the Studio admin account or an individual branch's client password.
 
-## Verification
+## Security
 
-```sh
+- **Private admin transport:** Studio's server calls the backend over a shared Unix socket. Privileged database access uses PostgreSQL's Unix socket; container operations use Docker's Unix socket.
+- **Separate client credentials:** Main and each branch have dedicated non-superuser client logins. The internal admin role is blocked on public PostgreSQL and PgBouncer connections.
+- **Password-based Studio login:** Admin passwords are stored as salted scrypt hashes; sessions use signed HttpOnly cookies.
+- **Sensitive operations:** Password reveal/copy and mutations require authenticated requests. Never expose the Docker socket or admin token publicly.
+- **Deployment boundary:** Docker-socket access gives the backend powerful host capabilities. Run it only on a trusted machine.
+- **HTTPS and network restrictions:** Use a trusted reverse proxy, set `STUDIO_COOKIE_SECURE=true` for HTTPS, and restrict Studio/database ports. Configure external database TLS as needed; do not assume default public connections are encrypted.
+
+### RLS considerations
+
+Studio's privileged internal login bypasses RLS. Test policy behavior using the selected database's **non-superuser client credentials**, not Studio's SQL Editor.
+
+Enabling RLS without applicable policies denies ordinary client row access. Policies restrict access but do not grant schema/table privileges. Sorabase does not provision Supabase-style `auth.uid()` or an application-user authentication service.
+
+## Development
+
+For source development and tests, use **Node.js 24+** and **pnpm 10.26.1**.
+
+```bash
+pnpm install
 pnpm build
 pnpm test
+```
+
+Additional checks:
+
+```bash
+pnpm --filter sorabase-backend typecheck
 pnpm --filter sorabase-backend test:integration
+pnpm --filter studio typecheck
 pnpm --filter studio test:integration
 ```
 
-These developer checks require Node.js 24+, pnpm 10.26.1 and `pnpm install`;
-they are not needed to start the stack with Compose.
-The integration suites use isolated real Postgres over Unix sockets. In the
-browser suite, Docker commands are executed by a **test-only local adapter**;
-this does not verify Docker image builds, PgBouncer startup, public port/firewall
-behavior, or a production deployment. Validate those using `docker compose up --build -d --wait` on a
-Docker-enabled Linux host.
+Integration checks need local PostgreSQL binaries; browser checks also need Chromium (`CHROMIUM_PATH` can override its location). Build before running browser integration tests. Their test-only Docker adapter does not verify production Docker images, PgBouncer startup, public ports, or firewall configuration.
 
-See `Backend/README.md` and `Frontend/README.md` for API and component details.
+For frontend development, `pnpm dev:studio` serves port 5000. A working backend Unix socket and private environment configuration are still required for live data.
+
+### Project structure
+
+```text
+.
+├── Frontend/             # Next.js Studio, UI components, browser tests
+├── Backend/              # TypeScript admin API, services, maintenance tools
+│   ├── data/             # Local metadata and encrypted credentials (runtime)
+│   └── backups/          # PostgreSQL archives (runtime)
+├── docker/               # PostgreSQL and PgBouncer startup configuration
+├── docker-compose.yml    # Complete single-host stack
+├── .env.example          # Environment template; no real secrets
+├── package.json          # Workspace commands
+└── LICENSE               # Apache License 2.0
+```
+
+## Troubleshooting
+
+| Problem | What to check |
+| --- | --- |
+| A service does not become healthy | Run `docker compose ps` and inspect that service's logs. Check required `.env` values and port conflicts. |
+| Studio reports missing admin setup | Confirm first-run account fields and distinct server secrets are configured. Existing accounts are not replaced on restart. |
+| Backend is unavailable | Check `studio` health, the shared admin socket, Docker socket permissions, and PostgreSQL health. |
+| PostgreSQL reports `28P01` | Verify credentials match the existing volume. Editing `.env` alone does not reset the stored password. |
+| A public database client cannot sign in | Use the selected database's **Connect** snippet, not the internal admin credentials. Check host, port, and firewall rules. |
+| RLS appears ineffective in Studio | Studio bypasses RLS; test with a non-superuser client and verify policies and privileges. |
+| Metrics are unavailable | Check PostgreSQL access and Docker permissions. Fresh installations need actual sampling time to build history. |
+
+## Contributing
+
+Issues and pull requests are welcome at [rehan3web/Astarbase](https://github.com/rehan3web/Astarbase).
+
+Before submitting a change:
+
+1. Describe the problem and expected behavior.
+2. Keep changes focused and add relevant tests.
+3. Run the appropriate build and checks.
+4. Never include `.env`, credentials, runtime database files, or backup archives.
+
+For component-specific notes, see the [backend guide](Backend/README.md) and [frontend guide](Frontend/README.md).
+
+## License
+
+Sorabase is distributed under the [Apache License 2.0](LICENSE).
