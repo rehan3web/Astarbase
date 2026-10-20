@@ -28,11 +28,9 @@ import {
   Fingerprint,
   Hash,
   Link as LinkIcon,
-  MoreVertical,
   Search,
   Table2 as TableIcon,
 } from 'lucide-react'
-import { SchemaSelector } from '@/components/ui/schema-selector'
 import { PrimaryKeyIcon } from '@/components/ui/primary-key-icon'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 import {
@@ -77,7 +75,6 @@ function TableNode({ data }: NodeProps<FlowTableNode>) {
           <TableIcon className="h-4 w-4 text-foreground-light shrink-0" strokeWidth={1.5} />
           <span className="text-foreground truncate">{table.name}</span>
         </div>
-        <MoreVertical className="h-4 w-4 text-foreground-light shrink-0" />
       </div>
 
       {/* Columns list */}
@@ -427,10 +424,9 @@ function SchemaVisualizerInner() {
   return (
     <div role="region" aria-label={schemaPending ? 'Loading schema visualizer' : 'Schema visualizer'} aria-busy={schemaPending} className="flex flex-col h-full w-full overflow-hidden bg-studio relative">
 
-      {/* Original top toolbar: schema selector, search, split SQL/export control, auto layout */}
+      {/* Top toolbar: search, split SQL/export control, auto layout */}
       <div className="h-11 shrink-0 border-b border-default bg-dash-sidebar flex items-center justify-between px-4 z-10 select-none">
         <div className="flex items-center gap-2">
-          <SchemaSelector selectedSchema={selectedSchema} onSelectSchema={setSelectedSchema} schemas={schemas.length ? schemas : ['public']} />
           <div className="relative flex items-center">
             <Search className="absolute left-2.5 h-3.5 w-3.5 text-foreground-lighter pointer-events-none" />
             <input type="text" aria-label="Find table" placeholder="Find table..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} className="h-7 pl-8 pr-6 w-44 rounded-md border border-strong bg-surface-100 hover:bg-surface-200/50 focus:bg-surface-100 text-xs text-foreground placeholder:text-foreground-lighter focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors" />

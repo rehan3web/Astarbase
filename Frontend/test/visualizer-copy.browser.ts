@@ -4,6 +4,12 @@ import { expect, type Page } from '@playwright/test'
 export async function verifyVisualizerCopy(page: Page, url: string, database: string) {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto(`${url}/visualizer`)
+  const visualizer = page.getByRole('region', { name: 'Schema visualizer', exact: true })
+  await expect(visualizer).toBeVisible()
+  await expect(visualizer.getByText('items', { exact: true })).toBeVisible()
+  await expect(visualizer.locator('svg.lucide-ellipsis-vertical, svg.lucide-more-vertical')).toHaveCount(0)
+  await expect(visualizer.getByRole('button', { name: /schema.*public/i })).toHaveCount(0)
+  await expect(visualizer.getByRole('combobox')).toHaveCount(0)
   const button = page.getByRole('button', { name: 'Copy as SQL', exact: true })
   await expect(button).toBeEnabled()
   const endpoint = `${url}/api/studio/databases/${database}/schema/sql`
