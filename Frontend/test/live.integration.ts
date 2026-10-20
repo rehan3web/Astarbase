@@ -137,6 +137,21 @@ try {
   await page.goto(url)
   await expect(page.getByLabel('Admin token', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
+  const loginForm = page.locator('.sora-auth__form-wrap')
+  const loginPanel = page.locator('.sora-auth__right')
+  const formBox = await loginForm.boundingBox()
+  const panelBox = await loginPanel.boundingBox()
+  assert.ok(formBox && panelBox)
+  assert.ok(Math.abs(formBox.y + formBox.height / 2 - panelBox.y - panelBox.height / 2) < 2, 'Login form must be vertically centered')
+  const loginColor = await page.getByRole('button', { name: 'Login', exact: true }).evaluate(button => {
+    const probe = document.createElement('span')
+    probe.style.backgroundColor = 'var(--brand-500)'
+    button.appendChild(probe)
+    const primary = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return { actual: getComputedStyle(button).backgroundColor, primary }
+  })
+  assert.equal(loginColor.actual, loginColor.primary)
   await expect(page.getByText('The Open Source alternative to Supabase and Neon.', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Sorabase on GitHub', exact: true })).toHaveAttribute('href', 'https://github.com/sorabase/sorabase')
   await expect(page.getByRole('link', { name: 'Sorabase on X', exact: true })).toHaveAttribute('href', 'https://x.com/sorabase_tech')

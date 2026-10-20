@@ -69,11 +69,11 @@ export function StudioLogin({
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: flex-start;
-          padding: clamp(80px, 16vh, 180px) 36px 92px;
+          justify-content: center;
+          padding: 92px 36px;
           background: #fff;
         }
-        .sora-auth__form-wrap { width: min(100%, 376px); margin-top: -14px; }
+        .sora-auth__form-wrap { width: min(100%, 376px); margin: 0; }
         .sora-auth__heading {
           display: flex;
           align-items: center;
@@ -142,18 +142,18 @@ export function StudioLogin({
         .sora-auth__submit {
           width: 100%;
           height: 43px;
-          border: 1px solid #262824;
+          border: 1px solid var(--brand-500);
           border-radius: 7px;
           padding: 0 16px;
-          color: #fff;
-          background: #262824;
+          color: #10251b;
+          background: var(--brand-500);
           font: inherit;
           font-size: 13px;
           font-weight: 600;
           cursor: pointer;
           transition: background 140ms ease, transform 140ms ease, opacity 140ms ease;
         }
-        .sora-auth__submit:not(:disabled):hover { background: #41443e; }
+        .sora-auth__submit:not(:disabled):hover { background: var(--brand-600); border-color: var(--brand-600); }
         .sora-auth__submit:not(:disabled):active { transform: translateY(1px); }
         .sora-auth__submit:disabled { cursor: not-allowed; opacity: .52; }
         .sora-auth__social {
@@ -182,8 +182,7 @@ export function StudioLogin({
           .sora-auth__brand { min-height: auto; padding: 21px 23px; gap: 28px; }
           .sora-auth__wordmark img { width: 27px; height: 27px; }
           .sora-auth__tagline { font-size: 12px; }
-          .sora-auth__right { min-height: 65vh; min-height: 65dvh; padding: 58px 23px 86px; }
-          .sora-auth__form-wrap { margin-top: -4px; }
+          .sora-auth__right { min-height: 65vh; min-height: 65dvh; padding: 86px 23px; }
           .sora-auth__social { bottom: 24px; }
         }
       `}</style>
