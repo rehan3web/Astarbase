@@ -78,7 +78,7 @@ export function TableToolbar({
   onInsertColumn,
 }: TableToolbarProps) {
   return (
-    <div className="h-11 shrink-0 border-b border-default bg-dash-sidebar flex items-center justify-between px-3 gap-2">
+    <div data-table-toolbar className="h-11 shrink-0 border-b border-default bg-white dark:bg-dash-sidebar flex items-center justify-between px-3 gap-2">
       {selectedRowIds.size > 0 ? (
         /* SELECTION STATE */
         <div className="flex items-center justify-between w-full">
@@ -148,7 +148,7 @@ export function TableToolbar({
                 value={filterSearch}
                 onChange={(e) => onFilterSearchChange(e.target.value)}
                 placeholder={`Filter by ${selectedTable.columns.slice(0, 2).map((c) => c.name).join(', ')}`}
-                className="w-full h-[28px] pl-8 pr-2 text-xs bg-white dark:bg-transparent border-0 shadow-none text-foreground placeholder:text-foreground-lighter focus:outline-none focus:ring-0"
+                className="w-full h-[28px] pl-8 pr-2 text-xs bg-transparent border-0 rounded-none shadow-none text-foreground placeholder:text-foreground-lighter focus:outline-none focus:ring-0"
               />
               {filterSearch && (
                 <button

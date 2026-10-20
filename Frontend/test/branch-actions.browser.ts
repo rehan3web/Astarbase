@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict'
+import { expect, type Page } from '@playwright/test'
+import type { Services } from '../../Backend/src/services'
+
+export async function verifyBranchActions(page: Page, url: string, services: Services, snapshot: (name: string) => Promise<unknown>) {
+  await services.branches.create('menu_child')
+  await services.branches.create('menu_nested', 'menu_child')
+  await page.goto(`${url}/branches`)
+  const list = page.getByRole('region', { name: 'Branch list', exact: true })
+  await expect(list.getByRole('button', { name: /^Actions for / })).toHaveCount(1)
+  await page.locator('[data-branch-row="menu_child"]').hover()
+  await expect(list.getByRole('button', { name: 'Actions for menu_child', exact: true })).toHaveCount(0)
+  await expect(list.getByRole('button', { name: 'Actions for main', exact: true })).toBeVisible()
+  const open = async (name: string) => {
+    const row = page.locator(`[data-branch-row="${name}"]`)
+    await row.click()
+    await expect(row).toHaveAttribute('data-selected', 'true')
+    await expect(list.getByRole('button', { name: /^Actions for / })).toHaveCount(1)
+    await page.getByRole('button', { name: `Actions for ${name}`, exact: true }).click()
+    return page.getByRole('menu')
+  }
+  let menu = await open('main')
+  await expect(menu.getByRole('menuitem')).toHaveText(['Rename tag'])
+  await snapshot('main-branch-actions')
+  await menu.getByRole('menuitem', { name: 'Rename tag', exact: true }).click()
+  await page.getByLabel('Branch tag', { exact: true }).fill('Live production')
+  await page.getByRole('button', { name: 'Save tag', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  assert.equal(services.catalog.store.branch('main')?.tag, 'Live production')
+  await page.keyboard.press('Escape')
+  const nested = page.locator('[data-branch-row="menu_nested"]')
+  await nested.focus()
+  await page.keyboard.press('Enter')
+  await expect(nested.getByRole('button', { name: 'Actions for menu_nested', exact: true })).toBeVisible()
+  await expect(list.getByRole('button', { name: /^Actions for / })).toHaveCount(1)
+  // Selection is local to this list and must not switch the active database.
+  await expect(page.locator('[data-branch-row="main"]')).toContainText('active')
+  assert.equal(services.catalog.store.branch('main')?.name, 'main')
+  for (const name of ['menu_child', 'menu_nested']) {
+    menu = await open(name)
+    await expect(menu.getByRole('menuitem')).toHaveText(['Edit tag', 'Pull / refresh', 'Delete branch'])
+    await expect(menu.getByRole('menuitem', { name: /Switch|Rename/ })).toHaveCount(0)
+    await menu.getByRole('menuitem', { name: 'Pull / refresh', exact: true }).click()
+    await expect(page.getByRole('dialog')).toContainText('This is not a merge and cannot be undone.')
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+    menu = await open(name)
+    await menu.getByRole('menuitem', { name: 'Delete branch', exact: true }).click()
+    await expect(page.getByRole('dialog').getByRole('button', { name: 'Delete branch', exact: true })).toBeDisabled()
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+    menu = await open(name)
+    await menu.getByRole('menuitem', { name: 'Edit tag', exact: true }).click()
+    await page.getByLabel('Branch tag', { exact: true }).fill('release')
+    await page.getByRole('button', { name: 'Save tag', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    assert.equal(services.catalog.store.branch(name)?.tag, 'release')
+  }
+  await page.reload()
+  menu = await open('menu_child')
+  await snapshot('child-branch-actions')
+  await expect(menu.getByRole('menuitem')).toHaveCount(3)
+  assert.equal(services.catalog.store.branch('main')?.tag, 'Live production')
+  console.log('PASS: main has only Rename tag; child/nested branches have Edit tag, Pull and Delete; tag persistence and confirmation guards preserved')
+}

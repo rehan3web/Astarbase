@@ -97,7 +97,7 @@ export async function verifyLoadingStates(page: Page, url: string, snapshot: (na
     await grayLoader('Loading live databases')
     branches.release()
     await page.getByRole('button', { name: 'Actions for main', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Edit tag', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Rename tag', exact: true }).click()
     await page.getByRole('textbox', { name: 'Branch tag', exact: true }).fill('loading-check')
     const branchReload = await hold('**/api/studio/branches')
     await page.getByRole('button', { name: 'Save tag', exact: true }).click()

@@ -22,6 +22,7 @@ import { verifyLoadingStates } from './loading-states.browser'
 import { verifyTableDefinition } from './table-definition.browser'
 import { verifyServiceStatus } from './service-status.browser'
 import { verifyTableSurfaces } from './table-surfaces.browser'
+import { verifyBranchActions } from './branch-actions.browser'
 import { verifySqlExports } from './sql-export.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
@@ -148,6 +149,12 @@ try {
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
   await page.getByLabel('Password', { exact: true }).fill(loginPassword)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  if (process.env.STUDIO_BRANCH_ACTIONS_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifyBranchActions(page, url, services, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
   if (process.env.STUDIO_TABLE_SURFACES_ONLY === '1') {
     await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
     await verifyTableSurfaces(page, url, snapshot)
@@ -589,7 +596,7 @@ try {
 
   await page.goto(`${url}/branches`)
   await page.getByRole('button', { name: 'Actions for main', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Edit tag', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Rename tag', exact: true }).click()
   await page.getByLabel('Branch tag', { exact: true }).fill('Live production')
   await page.getByRole('button', { name: 'Save tag', exact: true }).click()
   await expectToast('Branch tag updated')

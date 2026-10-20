@@ -11,7 +11,7 @@ export async function verifyTableSurfaces(page: Page, url: string, snapshot: (na
   await expect(page.locator('html')).not.toHaveClass(/dark/)
   const filter = page.getByPlaceholder('Filter by id, name', { exact: true })
   const search = page.getByPlaceholder('Search tables...', { exact: true })
-  for (const element of [table.locator('thead'), filter, search]) {
+  for (const element of [table.locator('thead'), page.locator('[data-table-toolbar]'), search]) {
     await expect(element).toHaveCSS('background-color', 'rgb(255, 255, 255)')
     // Tailwind's shadow-none may compute as transparent zero-size layers.
     const shadow = await element.evaluate(node => getComputedStyle(node).boxShadow)
@@ -19,6 +19,9 @@ export async function verifyTableSurfaces(page: Page, url: string, snapshot: (na
       .replaceAll('rgba(0, 0, 0, 0) 0px 0px 0px 0px', '')
       .replaceAll(', ', '') === '', true)
   }
+  await expect(filter).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(filter).toHaveCSS('border-top-width', '0px')
+  await expect(filter).toHaveCSS('border-radius', '0px')
   for (const cell of await table.locator('thead th').all()) {
     await expect(cell).toHaveCSS('background-color', 'rgb(255, 255, 255)')
     await expect(cell).toHaveCSS('box-shadow', 'none')

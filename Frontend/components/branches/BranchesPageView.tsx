@@ -37,7 +37,10 @@ import { formatBytes } from '@/lib/dashboard-metrics'
 import { LoadingIndicator, Spinner } from '@/components/ui/spinner'
 
 export function BranchesPageView() {
-  const { branches, branch: activeBranch, selectBranch, reload, branchesLoading } = useStudio()
+  const { branches, branch: activeBranch, reload, branchesLoading } = useStudio()
+  const [selectedBranchName, setSelectedBranchName] = useState<string | null>(null)
+  const selectedName = branches.some(branch => branch.name === selectedBranchName)
+    ? selectedBranchName : activeBranch?.name ?? branches[0]?.name
   const { notify } = useNotifications()
   const [createOpen, setCreateOpen] = useState(false)
   const [refreshOpen, setRefreshOpen] = useState(false)
@@ -75,6 +78,7 @@ export function BranchesPageView() {
       if (!parent) throw new Error('Select a valid parent database.')
       await api('/branches', { method: 'POST', body: { name, parent: parent.name, tag: tag || null } })
       await reload()
+      setSelectedBranchName(name)
       setCreateOpen(false); setNewBranchName(''); setNewBranchTag('dev')
       notify(`Branch "${name}" created`, 'success')
     } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') } finally { setBusy(false) }
@@ -187,8 +191,24 @@ export function BranchesPageView() {
         </div>
         {branches.map(branch => {
           const isDefault = !branch.parent_name
+          const isSelected = branch.name === selectedName
           return (
-            <div key={branch.name} className="grid grid-cols-[2fr_1fr_1fr_1fr_48px] items-center px-4 py-3 border-b border-default last:border-b-0 hover:bg-surface-200/40 transition-colors group">
+            <div
+              key={branch.name}
+              data-branch-row={branch.name}
+              data-selected={isSelected}
+              aria-current={isSelected ? 'true' : undefined}
+              aria-label={`Select branch ${branch.name}`}
+              tabIndex={0}
+              onClick={() => setSelectedBranchName(branch.name)}
+              onKeyDown={event => {
+                if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault()
+                  setSelectedBranchName(branch.name)
+                }
+              }}
+              className={`grid grid-cols-[2fr_1fr_1fr_1fr_48px] items-center px-4 py-3 border-b border-default last:border-b-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 ${isSelected ? 'bg-surface-200/40' : ''}`}
+            >
               <div className="flex items-center gap-2.5 min-w-0">
                 <GitBranch className="h-3.5 w-3.5 text-foreground-lighter shrink-0" />
                 <div className="min-w-0">
@@ -212,21 +232,16 @@ export function BranchesPageView() {
                 <span className="block text-[10px] text-foreground-muted mt-0.5">{branch.refreshed_at ? `Refreshed ${new Date(branch.refreshed_at).toLocaleDateString()}` : 'Never refreshed'}</span>
               </span>
               <div className="flex justify-end">
+                {isSelected && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button type="button" aria-label={`Actions for ${branch.name}`} className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-lighter hover:text-foreground hover:bg-surface-300 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer">
+                    <button type="button" aria-label={`Actions for ${branch.name}`} className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-lighter hover:text-foreground hover:bg-surface-300 cursor-pointer">
                       <MoreHorizontal className="h-4 w-4" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40 bg-surface-100 border-default text-foreground shadow-xl">
-                    <DropdownMenuItem className="text-xs gap-2 cursor-pointer" onSelect={() => selectBranch(branch.name)}>
-                      <GitBranch className="h-3.5 w-3.5 text-foreground-lighter" />Switch to branch
-                    </DropdownMenuItem>
                     <DropdownMenuItem className="text-xs gap-2 cursor-pointer" onSelect={() => openTagEditor(branch)}>
-                      <Pencil className="h-3.5 w-3.5 text-foreground-lighter" />Edit tag
-                    </DropdownMenuItem>
-                    <DropdownMenuItem disabled title="Branch rename is not provided by the connected API." className="text-xs gap-2 opacity-50">
-                      <Pencil className="h-3.5 w-3.5 text-foreground-lighter" />Rename unavailable
+                      <Pencil className="h-3.5 w-3.5 text-foreground-lighter" />{branch.parent_name ? 'Edit tag' : 'Rename tag'}
                     </DropdownMenuItem>
                     {branch.parent_name && <>
                       <DropdownMenuSeparator className="bg-border-muted" />
@@ -237,9 +252,9 @@ export function BranchesPageView() {
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />Delete branch
                       </DropdownMenuItem>
                     </>}
-                    {!branch.parent_name && <DropdownMenuItem disabled title="The base database cannot be refreshed or deleted." className="text-xs gap-2 opacity-50"><Trash2 className="h-3.5 w-3.5" />Base database protected</DropdownMenuItem>}
                   </DropdownMenuContent>
                 </DropdownMenu>
+                )}
               </div>
             </div>
           )
