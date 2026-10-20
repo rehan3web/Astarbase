@@ -113,19 +113,18 @@ export function TableDataGrid({
                 maxWidth: FROZEN_COL_WIDTH,
             }
             : undefined
-    const lastFrozenIdx = frozen.size - 1
 
     return (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
             <div className="flex-1 overflow-auto bg-studio">
                 <table className="w-full border-collapse text-left text-xs font-mono select-text">
                     {/* Header Row */}
-                    <thead className="sticky top-0 z-20 bg-surface-100 border-b border-default shadow-xs">
+                    <thead className="sticky top-0 z-20 bg-white dark:bg-surface-100 border-b border-default">
                         <tr>
                             {/* Checkbox column */}
                             <th
                                 className={cn(
-                                    'w-10 px-3 py-2 text-center border-r border-default bg-surface-100',
+                                    'w-10 px-3 py-2 text-center border-r border-default bg-white dark:bg-surface-100',
                                     hasFrozen && 'sticky left-0 z-10'
                                 )}
                             >
@@ -149,9 +148,8 @@ export function TableDataGrid({
                                         key={col.id}
                                         style={frozenStyle(colIdx)}
                                         className={cn(
-                                            'px-3 py-2 border-r border-default text-foreground font-medium whitespace-nowrap bg-surface-100 group select-none',
-                                            isFrozen && 'z-10',
-                                            colIdx === lastFrozenIdx && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]'
+                                            'px-3 py-2 border-r border-default text-foreground font-medium whitespace-nowrap bg-white dark:bg-surface-100 group select-none',
+                                            isFrozen && 'z-10'
                                         )}
                                     >
                                         <div className="flex items-center justify-between gap-3">
@@ -219,7 +217,7 @@ export function TableDataGrid({
                             })}
 
                             {/* Add Column Button Header */}
-                            <th className="w-10 px-2 py-2 border-r border-default text-center bg-surface-100">
+                            <th className="w-10 px-2 py-2 border-r border-default text-center bg-white dark:bg-surface-100">
                                 <button
                                     onClick={onInsertColumn}
                                     className="w-5 h-5 inline-flex items-center justify-center rounded text-foreground-lighter hover:text-foreground hover:bg-surface-200 transition-colors cursor-pointer"
@@ -281,8 +279,7 @@ export function TableDataGrid({
                                                     onDoubleClick={() => handleCellDoubleClick(idx, col.name, val)}
                                                     className={cn(
                                                         'px-3 py-2 border-r border-default whitespace-nowrap max-w-xs truncate text-foreground-light group-hover:text-foreground transition-colors cursor-text',
-                                                        isFrozen && 'z-[5] bg-studio',
-                                                        colIdx === lastFrozenIdx && 'shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]'
+                                                        isFrozen && 'z-[5] bg-studio'
                                                     )}
                                                 >
                                                     {editingCell?.rowIdx === idx && editingCell?.colName === col.name ? (

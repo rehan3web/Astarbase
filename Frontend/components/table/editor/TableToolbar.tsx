@@ -147,8 +147,8 @@ export function TableToolbar({
                 type="text"
                 value={filterSearch}
                 onChange={(e) => onFilterSearchChange(e.target.value)}
-                placeholder={`Filter by ${selectedTable.columns.slice(0, 2).map((c) => c.name).join(', ')} or ask AI`}
-                className="w-full h-[28px] pl-8 pr-2 text-xs bg-transparent border-0 text-foreground placeholder:text-foreground-lighter focus:outline-none focus:ring-0"
+                placeholder={`Filter by ${selectedTable.columns.slice(0, 2).map((c) => c.name).join(', ')}`}
+                className="w-full h-[28px] pl-8 pr-2 text-xs bg-white dark:bg-transparent border-0 shadow-none text-foreground placeholder:text-foreground-lighter focus:outline-none focus:ring-0"
               />
               {filterSearch && (
                 <button

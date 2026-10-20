@@ -10,7 +10,6 @@ import {
   DashboardMetrics,
   formatBytes,
   formatMetric,
-  formatTimestamp,
 } from '@/lib/dashboard-metrics'
 
 function MetricCard({ title, value, badges, loading = false }: { title: string; value: React.ReactNode; badges: string[]; loading?: boolean }) {
@@ -63,18 +62,22 @@ function ServiceStatusItem({ name, status, loading, description }: {
       : 'bg-rose-500'
 
   return (
-    <span
+    <div
+      data-service-card={name}
+      aria-busy={loading}
       title={detail || undefined}
       aria-label={`${name}: ${accessibleLabel}${detail ? `. ${detail}` : ''}`}
-      className="inline-flex items-center gap-2 text-sm text-foreground-light"
+      className="relative flex h-fit min-w-0 self-start flex-col rounded-xl border border-default bg-studio p-4 transition-colors hover:border-strong"
     >
-      {loading
-        ? <Spinner size={12} decorative />
-        : <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />}
-      <span>{name}</span>
-      {!loading && <span className="text-foreground-muted">{label}</span>}
+      <h3 className="break-words text-base font-semibold leading-tight text-foreground">{name}</h3>
+      <p className="mt-1 inline-flex min-w-0 items-center gap-2 text-base text-foreground-lighter">
+        {loading
+          ? <><Spinner size={12} decorative /><span className="sr-only">Loading status</span></>
+          : <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />}
+        {!loading && <span>{label}</span>}
+      </p>
       {detail && <span className="sr-only">{detail}</span>}
-    </span>
+    </div>
   )
 }
 
@@ -293,7 +296,7 @@ export function ProjectHomeView() {
 
       <SyncActivityChart activity={current?.activity ?? null} loading={metricsLoading} />
 
-      <div role="group" aria-label="Service health" className="flex flex-wrap items-center gap-x-6 gap-y-2">
+      <div role="group" aria-label="Service health" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <ServiceStatusItem name="PostgreSQL Engine" status={serviceStatuses.postgres} loading={serviceStatusLoading} />
         <ServiceStatusItem
           name="Row Level Security"
@@ -302,18 +305,12 @@ export function ProjectHomeView() {
           description="Active means at least one user table in the selected database has RLS enabled."
         />
         <ServiceStatusItem name="PgBouncer" status={serviceStatuses.pgbouncer} loading={serviceStatusLoading} />
-        {serviceStatusError && (
-          <span
-            role="alert"
-            title={serviceStatusError}
-            className="text-xs text-rose-500"
-          >
-            Status check failed
-            <span className="sr-only">: {serviceStatusError}</span>
-          </span>
-        )}
       </div>
-      {latest && <p className="text-xs text-foreground-muted">Latest persisted reading: {formatTimestamp(latest.sampledAt)}. CPU and RAM are shared across the Postgres container, not per branch or VPS totals.</p>}
+      {serviceStatusError && (
+        <span role="alert" title={serviceStatusError} className="sr-only">
+          Status check failed: {serviceStatusError}
+        </span>
+      )}
     </div>
   )
 }

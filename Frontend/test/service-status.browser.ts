@@ -25,6 +25,21 @@ export async function verifyServiceStatus(page: Page, url: string, config: Confi
     await expect(page.getByText(text, { exact: true })).toHaveCount(0)
   }
   assert.equal(await group.locator('[data-metric-card]').count(), 0)
+  await expect(group.locator('[data-service-card]')).toHaveCount(3)
+  for (const title of ['PostgreSQL Engine', 'Row Level Security', 'PgBouncer']) {
+    const card = group.locator(`[data-service-card="${title}"]`)
+    await expect(card.getByRole('heading', { name: title, exact: true })).toBeVisible()
+    const reference = await page.locator('[data-metric-card="Database Size"]').evaluate(element => {
+      const style = getComputedStyle(element)
+      return [style.backgroundColor, style.borderRadius, style.borderTopWidth, style.padding]
+    })
+    const actual = await card.evaluate(element => {
+      const style = getComputedStyle(element)
+      return [style.backgroundColor, style.borderRadius, style.borderTopWidth, style.padding]
+    })
+    assert.deepEqual(actual, reference)
+  }
+  await expect(page.getByText(/^Latest persisted reading:/)).toHaveCount(0)
   const refresh = page.getByRole('button', { name: 'Refresh', exact: true })
   await expect(refresh).toBeEnabled({ timeout: 30000 })
   await withDatabase(config, config.DB_NAME, client => client.query('ALTER TABLE public.items ENABLE ROW LEVEL SECURITY'))
@@ -32,7 +47,7 @@ export async function verifyServiceStatus(page: Page, url: string, config: Confi
   await expect(rls).toContainText('Active')
   assert.equal((await (await page.request.get(endpoint)).json()).rls.active, true)
   await expect(refresh).toBeEnabled({ timeout: 30000 })
-  await snapshot('compact-service-status-dark')
+  await snapshot('service-status-cards-dark')
   await withDatabase(config, config.DB_NAME, client => client.query('ALTER TABLE public.items DISABLE ROW LEVEL SECURITY'))
   await refresh.click()
   await expect(rls).toContainText('Inactive')
@@ -44,10 +59,10 @@ export async function verifyServiceStatus(page: Page, url: string, config: Confi
   await expect(postgres).toContainText('Unavailable')
   await expect(rls).toContainText('Unavailable')
   await expect(pooler).toContainText('Unavailable')
-  await expect(group.getByRole('alert')).toContainText('Status check failed')
+  await expect(page.getByRole('alert').filter({ hasText: 'Status check failed' })).toHaveText('Status check failed: Status endpoint unavailable')
   await page.unroute('**/metrics/status')
   await expect(refresh).toBeEnabled({ timeout: 30000 })
   await refresh.click()
   await expect(postgres).toContainText('Active')
-  console.log('PASS: compact real PostgreSQL/RLS service statuses, absent PgBouncer, refresh, error and recovery')
+  console.log('PASS: matching service status cards, removed reading footer, real RLS toggles, refresh, error and recovery')
 }

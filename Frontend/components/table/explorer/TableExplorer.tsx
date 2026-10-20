@@ -99,7 +99,7 @@ export function TableExplorer({
             placeholder="Search tables..."
             value={tableSearch}
             onChange={(e) => onTableSearchChange(e.target.value)}
-            className="w-full h-7 pl-8 pr-2 text-xs bg-surface-100 border border-strong rounded text-foreground placeholder:text-foreground-lighter focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full h-7 pl-8 pr-2 text-xs bg-white dark:bg-surface-100 shadow-none border border-strong rounded text-foreground placeholder:text-foreground-lighter focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
 
