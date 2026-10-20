@@ -5,6 +5,7 @@
   <p>A modern, self-hosted PostgreSQL management platform inspired by Supabase and Neon.</p>
   <p>
     <a href="#features">Features</a> ·
+    <a href="#demo-screenshots">Screenshots</a> ·
     <a href="#infrastructure">Infrastructure</a> ·
     <a href="#installation">Installation</a> ·
     <a href="#security">Security</a> ·
@@ -59,6 +60,46 @@ Each branch is a separate database inside the **same PostgreSQL instance**, with
 - Pulling replaces the child's contents with its parent's snapshot. It is **not a merge** and can disconnect target clients.
 
 Branch creation uses PostgreSQL dump/restore operations; it is not storage-level copy-on-write or serverless branching.
+
+## Demo screenshots
+
+A look inside Sorabase Studio in dark mode. Click a screenshot to view it at full size.
+
+### Dashboard
+
+Database metrics, recorded activity, and PostgreSQL, RLS, and PgBouncer status in one view.
+
+[![Sorabase dashboard with database metrics, activity chart, and service status](docs/screenshots/dashboard.png)](docs/screenshots/dashboard.png)
+
+### SQL Editor
+
+Write and run SQL, organize saved queries, and inspect query results.
+
+[![Sorabase SQL Editor with saved-query sidebar and query results](docs/screenshots/sql-editor.png)](docs/screenshots/sql-editor.png)
+
+### Table Editor
+
+Browse records, filter rows, edit data, and inspect table definitions.
+
+[![Sorabase Table Editor displaying users, column headers, and pagination](docs/screenshots/table-editor.png)](docs/screenshots/table-editor.png)
+
+### Database branches
+
+Manage main and child databases with tags, storage details, and branch actions.
+
+[![Sorabase Branches page showing main and a child database](docs/screenshots/branches.png)](docs/screenshots/branches.png)
+
+### Schema Visualizer
+
+Explore tables and their foreign-key relationships on an interactive diagram.
+
+[![Sorabase Schema Visualizer showing the relationship between orders and users](docs/screenshots/schema-visualizer.png)](docs/screenshots/schema-visualizer.png)
+
+### Connect
+
+Access connection strings, transaction-pooler details, and PSQL examples with passwords masked by default.
+
+[![Sorabase Connect page with a masked PostgreSQL connection string](docs/screenshots/connect.png)](docs/screenshots/connect.png)
 
 ## Infrastructure
 
