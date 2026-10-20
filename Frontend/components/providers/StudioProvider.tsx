@@ -5,6 +5,7 @@ import { api, Branch, AdminSettings, errorMessage } from '@/lib/api'
 import { useTheme } from './ThemeProvider'
 import { useNotifications } from './NotificationProvider'
 import { LoadingIndicator } from '@/components/ui/spinner'
+import { StudioLogin } from '@/components/auth/StudioLogin'
 
 type Studio = { branches: Branch[]; database: string; branch: Branch | undefined; settings: AdminSettings | null; branchesLoading: boolean; selectBranch: (name: string) => void; reload: () => Promise<void> }
 const Context = createContext<Studio | null>(null)
@@ -76,17 +77,16 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const branch = branches.find(b => b.name === selected)
   if (authenticated === null) return <LoadingIndicator label="Checking Studio session" className="min-h-[100dvh] bg-studio" size={28} />
   if (!authenticated) return (
-    <div className="h-screen grid place-items-center bg-studio p-6">
-      <form onSubmit={login} className="w-full max-w-md rounded-lg border border-default p-8 space-y-5 bg-dash-sidebar">
-        <h1 className="text-xl font-semibold">Sorabase Admin Studio</h1>
-        <p className="text-sm text-foreground-lighter">Sign in with your admin username or email and password.</p>
-        {!configured && <p role="alert" className="text-amber-500 text-sm">Admin login needs server-side setup.</p>}
-        <label className="block text-sm">Username or email<input type="text" autoComplete="username" placeholder="Enter your username or email" required maxLength={254} value={identifier} onChange={e => setIdentifier(e.target.value)} className="mt-2 w-full rounded border border-default bg-studio p-2" /></label>
-        <label className="block text-sm">Password<input type="password" autoComplete="current-password" required maxLength={256} value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded border border-default bg-studio p-2" /></label>
-        {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
-        <button disabled={busy || !configured} className="w-full rounded bg-brand-500 text-black p-2 disabled:opacity-50">{busy ? 'Signing in…' : 'Sign in'}</button>
-      </form>
-    </div>
+    <StudioLogin
+      identifier={identifier}
+      password={password}
+      error={error}
+      busy={busy}
+      configured={configured}
+      onIdentifierChange={setIdentifier}
+      onPasswordChange={setPassword}
+      onSubmit={login}
+    />
   )
   if (!branch) return <div className="grid min-h-[100dvh] place-items-center bg-studio p-6">
     <div className="max-w-xl space-y-4 text-center">
