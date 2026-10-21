@@ -5,7 +5,9 @@ RUN apk add --no-cache pgbouncer postgresql17-client \
     && addgroup -S studio-pool && adduser -S -D -H -G studio-pool studio-pool \
     && mkdir -p /etc/pgbouncer \
     && chown -R studio-pool:studio-pool /etc/pgbouncer
-COPY entrypoint.mts /entrypoint.mts
+# Git checkouts created under a private umask may have mode 0600. The runtime
+# user must be able to read this source; no credentials are stored in it.
+COPY --chmod=0644 entrypoint.mts /entrypoint.mts
 RUN node --check /entrypoint.mts
 USER studio-pool
 EXPOSE 6432

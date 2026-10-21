@@ -168,6 +168,28 @@ Application rows stay in PostgreSQL. Client passwords are encrypted in private f
 
 No host Node.js, pnpm installation, manual schema push, or separate frontend/backend startup is required for Docker installation.
 
+### Interactive installer
+
+Run the script from the repository root, or place just `setup.sh` in a directory on your server:
+
+```bash
+bash setup.sh
+```
+
+The menu offers **Standard Install**, **Uninstall**, and **Exit**. If only the script is present, Standard Install automatically clones `https://github.com/rehan3web/Astarbase.git` (branch `main`) into a `Sorabase/` folder beside the script, then continues there. Existing complete repositories are reused without pulling updates or overwriting files. Download failures stop installation safely.
+
+Standard Install asks for database name, database user/password, and admin username/email/password. Password input is hidden. It copies the example configuration with the other defaults, securely generates independent API/session secrets using OpenSSL, saves a private `.env`, and builds/starts the complete Docker stack. After healthchecks pass, it prints **Sorabase Installed** and the Studio IP/port.
+
+Requirements: Linux, Docker Engine, Compose v2, and OpenSSL; Git and GitHub network access are also required for automatic download. The script uses the local Docker socket; run with `sudo bash setup.sh` if your account does not have Docker access. It does not install host packages or change firewall rules. If the detected IP is private, use your server's public IP instead.
+
+If `.env` already exists, Standard Install reuses it rather than overwriting passwords or changing an existing admin login. A failed install preserves configuration/data so the same menu option can retry safely.
+
+**Uninstall is permanent.** Only after typing the exact word `confirm`, the script removes this Compose project's containers, service images, named volumes, local `Backend/data/`, `Backend/backups/`, and root `.env`. Source files remain. Other Docker projects are not pruned; shared images still in use cannot be removed. Keep the original `.env` until uninstall is complete so the correct project can be identified.
+
+When running the standalone script again, keep it beside the same `Sorabase/` folder so retries and Uninstall find the original configuration. Uninstall never clones a new repository.
+
+Alternatively, follow the manual steps below.
+
 ### 1. Clone the repository
 
 ```bash

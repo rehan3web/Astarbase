@@ -129,6 +129,8 @@ test('PgBouncer forwards any database name and Compose persists separate admin a
   // Alpine installs root-owned config files, not just the parent directory.
   assert.match(dockerfile, /chown -R studio-pool:studio-pool \/etc\/pgbouncer/);
   assert.match(dockerfile, /USER studio-pool/);
+  // Image permissions must not inherit a standalone installer's umask 077.
+  assert.match(dockerfile, /^COPY --chmod=0644 entrypoint\.mts \/entrypoint\.mts$/m);
   assert.doesNotMatch(dockerfile, /python/i);
   assert.match(dockerfile, /ENTRYPOINT \["node", "\/entrypoint\.mts"\]/);
   const pool = await readFile(new URL('../../docker/pgbouncer/entrypoint.mts', import.meta.url), 'utf8');
