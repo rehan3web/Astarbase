@@ -238,10 +238,6 @@ export function TableToolbar({
               Add RLS policy
             </Button>
 
-            <Button variant="default" size="small" disabled title="Role impersonation is not exposed by the connected API" className="text-xs shrink-0 whitespace-nowrap px-2.5 h-[28px] gap-1 text-foreground-muted">
-              Role <span className="font-semibold font-mono">unavailable</span><ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
-            </Button>
-
             {/* More options button */}
             <Button
               variant="default"

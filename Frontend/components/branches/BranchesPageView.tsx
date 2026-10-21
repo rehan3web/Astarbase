@@ -149,7 +149,7 @@ export function BranchesPageView() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-studio p-6 md:p-8 space-y-6">
+    <div className="flex-1 overflow-y-auto bg-white dark:bg-studio p-6 md:p-8 space-y-6">
       {/* Header — original branch-management composition */}
       <div className="flex items-center justify-between pb-4 border-b border-default">
         <div>
@@ -181,8 +181,8 @@ export function BranchesPageView() {
       {error && <div role="alert" className="border border-destructive/30 bg-destructive/5 rounded-md px-3 py-2 text-sm text-red-400">{error}</div>}
 
       {/* Branches Table — original five-column layout; unavailable metadata is explicit */}
-      <div role="region" aria-label={branchesLoading ? 'Loading branches' : 'Branch list'} aria-busy={branchesLoading} className="rounded-lg border border-default overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_48px] bg-surface-200/60 border-b border-default px-4 py-2.5">
+      <div role="region" aria-label={branchesLoading ? 'Loading branches' : 'Branch list'} aria-busy={branchesLoading} className="rounded-lg border border-default overflow-hidden bg-white dark:bg-studio">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_48px] bg-white dark:bg-surface-200/60 border-b border-default px-4 py-2.5">
           <span className="text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">Branch name</span>
           <span className="text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">Tag</span>
           <span className="text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">Storage</span>
@@ -207,7 +207,7 @@ export function BranchesPageView() {
                   setSelectedBranchName(branch.name)
                 }
               }}
-              className={`grid grid-cols-[2fr_1fr_1fr_1fr_48px] items-center px-4 py-3 border-b border-default last:border-b-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 ${isSelected ? 'bg-surface-200/40' : ''}`}
+              className={`grid grid-cols-[2fr_1fr_1fr_1fr_48px] items-center px-4 py-3 border-b border-default last:border-b-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 ${isSelected ? 'dark:bg-surface-200/40' : ''}`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <GitBranch className="h-3.5 w-3.5 text-foreground-lighter shrink-0" />

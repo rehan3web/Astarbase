@@ -239,7 +239,6 @@ export function ProjectHomeView() {
           </div>
           <p className="text-sm text-foreground-lighter mt-1 flex flex-wrap items-center gap-2">
             <span className="font-mono">{database}</span><span>·</span>
-            <span>{metricsLoading ? <><Spinner size={14} decorative /><span className="sr-only">Loading persisted metrics</span></> : current ? `Sampled every ${current.intervalSeconds}s` : 'Metrics unavailable'}</span><span>·</span>
             <span>{branches.length} managed databases</span>
           </p>
         </div>
