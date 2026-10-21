@@ -180,7 +180,9 @@ The menu offers **Standard Install**, **Uninstall**, and **Exit**. If only the s
 
 Standard Install asks for database name, database user/password, and admin username/email/password. Password input is hidden. It copies the example configuration with the other defaults, securely generates independent API/session secrets using OpenSSL, saves a private `.env`, and builds/starts the complete Docker stack. After healthchecks pass, it prints **Sorabase Installed** and the Studio IP/port.
 
-Requirements: Linux, Docker Engine, Compose v2, and OpenSSL; Git and GitHub network access are also required for automatic download. The script uses the local Docker socket; run with `sudo bash setup.sh` if your account does not have Docker access. It does not install host packages or change firewall rules. If the detected IP is private, use your server's public IP instead.
+Requirements: Linux, Docker Engine, Compose v2, and OpenSSL; Git and GitHub network access are also required for automatic download. The script uses the local Docker socket; run with `sudo bash setup.sh` if your account does not have Docker access. It does not install host packages or change firewall rules.
+
+With `curl` available, the installer detects public IPv4 using bounded HTTPS requests to `api.ipify.org`, then `ipv4.icanhazip.com` as a fallback. These requests send no credentials or configuration. Private/reserved IP responses are rejected. If detection fails, installation still completes with a `YOUR_PUBLIC_IP` placeholder, never a private address. The detected address is the server's outbound public IP; NAT port forwarding, firewall access, and HTTPS still need to be configured separately.
 
 If `.env` already exists, Standard Install reuses it rather than overwriting passwords or changing an existing admin login. A failed install preserves configuration/data so the same menu option can retry safely.
 

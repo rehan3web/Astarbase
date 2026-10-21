@@ -46,6 +46,14 @@ if (args.includes('config')) {
   chmodSync(path.join(bin, 'docker'), 0o700);
   writeFileSync(path.join(bin, 'hostname'), '#!/usr/bin/env bash\nprintf "198.51.100.42 10.0.0.1\\n"\n');
   chmodSync(path.join(bin, 'hostname'), 0o700);
+  // No external IP service is contacted by installer tests.
+  writeFileSync(path.join(bin, 'curl'), `#!${process.execPath}
+if (process.env.FAIL_IP_LOOKUP) process.exit(28);
+const backup = process.argv.at(-1) === 'https://ipv4.icanhazip.com';
+console.log((backup ? process.env.FAKE_BACKUP_PUBLIC_IP : undefined)
+  ?? process.env.FAKE_PUBLIC_IP ?? '8.8.4.4');
+`);
+  chmodSync(path.join(bin, 'curl'), 0o700);
   const environment = {
     ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_LOG: log, REAL_DOCKER: realDocker,
     DB_NAME: 'wrong_exported_database', DB_PASSWORD: 'wrong-exported-password',
@@ -170,7 +178,8 @@ test('Standard Install copies defaults, safely preserves special input, creates 
     const result = f.install();
     assert.equal(result.status, 0, result.output);
     assert.match(result.output, /Sorabase Installed/);
-    assert.match(result.output, /Studio IP : http:\/\/198\.51\.100\.42:5000/);
+    assert.match(result.output, /Studio IP : http:\/\/8\.8\.4\.4:5000/);
+    assert.doesNotMatch(result.output, /198\.51\.100\.42/);
     const { name, services } = f.config();
     assert.equal(name, 'sorabase');
     assert.equal(services.postgres.environment.POSTGRES_DB, 'project_db');
@@ -229,7 +238,7 @@ test('failed startup retains .env; retry reuses secrets and reports actual mappe
     const retry = f.run('1\n', { FAKE_PORT: '5050' });
     assert.equal(retry.status, 0, retry.output);
     assert.match(retry.output, /Reusing it/);
-    assert.match(retry.output, /http:\/\/198\.51\.100\.42:5050/);
+    assert.match(retry.output, /http:\/\/8\.8\.4\.4:5050/);
     assert.equal(readFileSync(path.join(f.root, '.env'), 'utf8'), before.replace('STUDIO_PORT=5000', 'STUDIO_PORT=5050'));
     assert.equal(f.commands().some(args => args.includes('down')), false);
   } finally { f.clean(); }
@@ -275,6 +284,28 @@ test('failed uninstall preserves local data and configuration for recovery', { s
     assert.doesNotMatch(result.output, /Sorabase Uninstalled/);
     assert.equal(existsSync(path.join(f.root, '.env')), true);
     assert.equal(existsSync(path.join(f.root, 'Backend/data/keep')), true);
+  } finally { f.clean(); }
+});
+
+test('public IP detection uses a validated backup and never substitutes a private address on failure', { skip: !composeAvailable }, () => {
+  const f = fixture();
+  try {
+    assert.equal(f.install().status, 0);
+    const env = readFileSync(path.join(f.root, '.env'), 'utf8');
+    const fallback = f.run('1\n', { FAKE_PUBLIC_IP: '10.200.208.10', FAKE_BACKUP_PUBLIC_IP: '8.8.8.8' });
+    assert.equal(fallback.status, 0, fallback.output);
+    assert.match(fallback.output, /Studio IP : http:\/\/8\.8\.8\.8:5000/);
+    for (const value of ['10.200.208.10', '127.0.0.1', '169.254.1.2', '172.16.1.2', '192.168.1.1', '100.64.0.1', '198.51.100.42', '999.1.2.3', '<html>error</html>']) {
+      const result = f.run('1\n', { FAKE_PUBLIC_IP: value });
+      assert.equal(result.status, 0, result.output);
+      assert.match(result.output, /Sorabase Installed/);
+      assert.match(result.output, /Studio IP : http:\/\/YOUR_PUBLIC_IP:5000/);
+      assert.match(result.output, /Public IPv4 detection unavailable/);
+    }
+    const offline = f.run('1\n', { FAIL_IP_LOOKUP: '1' });
+    assert.equal(offline.status, 0, offline.output);
+    assert.match(offline.output, /YOUR_PUBLIC_IP:5000/);
+    assert.equal(readFileSync(path.join(f.root, '.env'), 'utf8'), env);
   } finally { f.clean(); }
 });
 

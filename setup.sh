@@ -201,19 +201,56 @@ create_environment() {
   TEMP_ENV=''
 }
 
+is_public_ipv4() {
+  local ip="$1" a b c d octet
+  [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || return 1
+  IFS=. read -r a b c d <<< "$ip"
+  for octet in "$a" "$b" "$c" "$d"; do
+    [[ "$octet" == 0 || "$octet" != 0* ]] || return 1
+    (( 10#$octet <= 255 )) || return 1
+  done
+  # Reject private, loopback, link-local, shared NAT, documentation, multicast
+  # and reserved ranges rather than displaying them as a public Studio URL.
+  (( a != 0 && a != 10 && a != 127 && a < 224 )) || return 1
+  (( a != 100 || b < 64 || b > 127 )) || return 1
+  (( a != 169 || b != 254 )) || return 1
+  (( a != 172 || b < 16 || b > 31 )) || return 1
+  (( a != 192 || ! ((b == 168) || (b == 0 && (c == 0 || c == 2)) || (b == 88 && c == 99)) )) || return 1
+  (( a != 198 || ! ((b == 18 || b == 19) || (b == 51 && c == 100)) )) || return 1
+  (( a != 203 || b != 0 || c != 113 )) || return 1
+}
+
+detect_public_ipv4() {
+  command -v curl >/dev/null 2>&1 || return 1
+  local endpoint address
+  # HTTPS IP-only services receive no configuration or credentials. Bound each
+  # request so an offline host can still finish installation.
+  for endpoint in https://api.ipify.org https://ipv4.icanhazip.com; do
+    if address="$(curl --ipv4 --fail --silent --show-error --proto '=https' \
+      --connect-timeout 2 --max-time 5 --max-filesize 64 "$endpoint" 2>/dev/null)"; then
+      address="${address//$'\r'/}"
+      if is_public_ipv4 "$address"; then
+        printf '%s' "$address"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
 show_address() {
   local address='' port=''
-  address="$(hostname -I 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+\./ && $i !~ /^127\./) {print $i; exit}}')" || true
+  address="$(detect_public_ipv4)" || true
   port="$(compose port frontend 5000 2>/dev/null)" || true
   port="${port##*:}"
   [[ "$port" =~ ^[0-9]+$ ]] || port=5000
   printf '\nSorabase Installed\n'
   if [[ -n "$address" ]]; then
     printf 'Studio IP : http://%s:%s\n' "$address" "$port"
-    printf 'If this is a private/NAT address, use your server public IP with port %s.\n' "$port"
+    printf 'Public IPv4 detected. Allow inbound port %s in your server firewall/NAT to access Studio.\n' "$port"
   else
-    printf 'Studio IP : http://YOUR_SERVER_IP:%s\n' "$port"
-    printf 'Automatic IP detection was unavailable; replace YOUR_SERVER_IP with your server address.\n'
+    printf 'Studio IP : http://YOUR_PUBLIC_IP:%s\n' "$port"
+    printf 'Public IPv4 detection unavailable. Ensure curl and outbound HTTPS are available, or replace YOUR_PUBLIC_IP with your server public IP.\n'
   fi
   printf 'Use your admin username/email and password to sign in.\n'
   printf 'Before Internet access, configure HTTPS and restrict database ports 5432/6432 with firewall rules.\n'
