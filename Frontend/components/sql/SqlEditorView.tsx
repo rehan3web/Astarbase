@@ -34,7 +34,6 @@ const makeScratch = (): SqlSnippet => ({
 export function SqlEditorView() {
   const { database } = useStudio()
   const { notify } = useNotifications()
-  const [rawOutput, setRawOutput] = useState('')
   const executionVersion = useRef(0)
   const [folders, setFolders] = useState<SqlFolder[]>([])
   const [snippets, setSnippets] = useState<SqlSnippet[]>([makeScratch()])
@@ -247,12 +246,10 @@ export function SqlEditorView() {
     if (isExecuting) return
     const version = ++executionVersion.current
     setIsExecuting(true)
-    setRawOutput('')
     try {
       const result = await api<SqlResponse>('/sql', { method: 'POST', body: { database, sql: currentSql } })
       if (version !== executionVersion.current) return
       const parsed = parseSqlExecutionOutput(currentSql, result.stdout)
-      setRawOutput(`${result.stdout}${result.stderr ? `\n${result.stderr}` : ''}`)
       setQueryResult({ ...parsed, executionTimeMs: result.durationMs, rowCount: parsed.rows.length, status: 'success', message: parsed.rows.length ? (result.stderr || undefined) : 'Query executed successfully' })
       setActiveBottomTab('results')
       notify('Query executed successfully')
@@ -268,7 +265,6 @@ export function SqlEditorView() {
   useEffect(() => {
     executionVersion.current++
     setQueryResult(null)
-    setRawOutput('')
     setIsExecuting(false)
   }, [database])
 
@@ -579,7 +575,6 @@ export function SqlEditorView() {
             onRunQuery={handleRunQuery}
             onDownloadCsv={handleDownloadCsv}
           />
-          {rawOutput && <details className="shrink-0 border-t border-default p-2 text-xs max-h-40 overflow-auto"><summary className="cursor-pointer text-foreground-lighter">Complete raw output (all statements and notices)</summary><pre className="whitespace-pre-wrap p-2">{rawOutput}</pre></details>}
         </div>
       </div>
     </div>

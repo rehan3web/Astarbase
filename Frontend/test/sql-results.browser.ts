@@ -25,10 +25,7 @@ export async function verifySqlExecutionFeedback(page: Page, url: string, databa
   await expect(status).toHaveText('Query executed successfully')
   await expect(page.getByRole('columnheader', { name: 'output', exact: true })).toHaveCount(0)
   const raw = page.locator('details').filter({ hasText: 'Complete raw output (all statements and notices)' })
-  await expect(raw).toHaveJSProperty('open', false)
-  await raw.locator('summary').click()
-  await expect(raw.locator('pre')).toContainText('CREATE TABLE')
-  await raw.locator('summary').click()
+  await expect(raw).toHaveCount(0)
 
   assert.ok((await execute("INSERT INTO public.sql_success_fixture VALUES(1, 'returning value') RETURNING id, label;")).ok())
   await expect(page.getByRole('cell', { name: 'returning value', exact: true })).toBeVisible()
@@ -45,5 +42,5 @@ export async function verifySqlExecutionFeedback(page: Page, url: string, databa
   assert.ok((await execute('DROP TABLE public.sql_success_fixture;')).ok())
   await expect(status).toHaveText('Query executed successfully')
   await expect(page.locator('[data-studio-toast]').filter({ hasText: 'Query executed successfully' }).last()).toBeVisible()
-  console.log('PASS: DDL batches and UPDATE show success instead of command tags; raw diagnostics, RETURNING, SELECT and SQL errors preserved')
+  console.log('PASS: DDL batches and UPDATE show success without raw-output section; RETURNING, SELECT and SQL errors preserved')
 }

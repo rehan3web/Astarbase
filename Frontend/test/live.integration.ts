@@ -27,6 +27,7 @@ import { verifySqlExports } from './sql-export.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
 import { verifyStorageAndBackups } from './backups.browser'
+import { verifyBackupSurfaces } from './backup-surfaces.browser'
 import { pipeline } from 'node:stream/promises'
 import { verifyVisualizerCopy } from './visualizer-copy.browser'
 import { verifySqlExecutionFeedback } from './sql-results.browser'
@@ -191,6 +192,20 @@ try {
     assert.equal((await page.request.get(`${url}/api/studio/branches`)).status(), 200)
     assert.deepEqual(browserErrors, [])
     console.log('PASS: split login layout, social links only, password visibility, invalid credentials, username/email login, logout and HttpOnly session')
+    return
+  }
+  if (process.env.STUDIO_BACKUP_SURFACES_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifyBackupSurfaces(page, url, snapshot)
+    await verifyStorageAndBackups(page, url, id => services!.postgres.removeDump(id))
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+  if (process.env.STUDIO_SQL_RESULTS_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifySqlExecutionFeedback(page, url, config.DB_NAME, setQuery)
+    await snapshot('sql-success')
+    assert.deepEqual(browserErrors, [])
     return
   }
   if (process.env.STUDIO_SQL_SCROLL_ONLY === '1') {
@@ -505,13 +520,6 @@ try {
     return
   }
 
-  if (process.env.STUDIO_SQL_RESULTS_ONLY === '1') {
-    await verifySqlExecutionFeedback(page, url, config.DB_NAME, setQuery)
-    await snapshot('sql-success')
-    assert.deepEqual(browserErrors, [])
-    return
-  }
-
   await verifyVisualizerCopy(page, url, config.DB_NAME)
   await snapshot('visualizer-copy')
   if (process.env.STUDIO_VISUALIZER_ONLY === '1') {
@@ -693,7 +701,8 @@ try {
   await page.goto(`${url}/sql`)
   await setQuery("UPDATE items SET name='dev only' WHERE id=1;")
   await page.getByTitle('Run query (Ctrl+Enter)').click()
-  await expect(page.getByText('Complete raw output (all statements and notices)')).toBeVisible()
+  await expect(page.locator('main pre[role="status"]')).toHaveText('Query executed successfully')
+  await expect(page.getByText('Complete raw output (all statements and notices)')).toHaveCount(0)
   await withDatabase(config, config.DB_NAME, async client => assert.equal((await client.query('SELECT name FROM items WHERE id=1')).rows[0].name, 'edited from browser'))
   console.log('PASS: branch creation, shared branch selection and database isolation')
 

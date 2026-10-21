@@ -140,7 +140,7 @@ export function BackupsPageView() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-studio p-6 md:p-8 space-y-6 w-full">
+    <div data-backups-page className="flex-1 overflow-y-auto bg-white dark:bg-studio p-6 md:p-8 space-y-6 w-full [&_button]:shadow-none">
       {/* Header — original database-backup title and action */}
       <div className="flex items-center justify-between pb-4 border-b border-default">
         <div>
@@ -153,7 +153,7 @@ export function BackupsPageView() {
           </p>
         </div>
         <Button
-          variant="default"
+          variant="primary"
           size="small"
           iconLeft={<Plus className="h-3.5 w-3.5" />}
           onClick={() => {
@@ -162,7 +162,7 @@ export function BackupsPageView() {
             setNewBackupName(`manual-backup-${stamp}`)
             setCreateOpen(true)
           }}
-          className="gap-1.5 font-medium shadow-xs"
+          className="gap-1.5 font-medium shadow-none"
         >
           Create backup
         </Button>
@@ -172,9 +172,8 @@ export function BackupsPageView() {
 
       {/* Search & Stats Bar — live server values */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-lighter" />
-          <Input placeholder="Search backups..." value={search} onChange={event => setSearch(event.target.value)} className="pl-9 bg-surface-100 border-default text-xs h-8 text-foreground placeholder:text-foreground-muted focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" />
+        <div className="flex-1 max-w-sm">
+          <Input aria-label="Search backups" iconLeft={<Search className="h-3.5 w-3.5" aria-hidden="true" />} placeholder="Search backups..." value={search} onChange={event => setSearch(event.target.value)} className="bg-white dark:bg-surface-100 border-default shadow-none text-xs h-8 text-foreground placeholder:text-foreground-muted focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" />
         </div>
         <div className="flex items-center gap-2 text-xs text-foreground-lighter flex-wrap">
           <span>{loading ? <><Spinner size={14} decorative /><span className="sr-only">Loading backups</span></> : `${backups.length} backups`}</span>
@@ -185,8 +184,8 @@ export function BackupsPageView() {
       </div>
 
       {/* Backups List — original 12-column row and action-menu composition */}
-      <div role="region" aria-label={loading ? 'Loading backups' : 'Backups list'} aria-busy={loading} className="rounded-lg border border-default overflow-hidden shadow-xs">
-        <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-2.5 bg-surface-200/60 border-b border-default text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">
+      <div role="region" aria-label={loading ? 'Loading backups' : 'Backups list'} aria-busy={loading} className="rounded-lg border border-default overflow-hidden bg-white dark:bg-studio shadow-none">
+        <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-2.5 bg-white dark:bg-surface-200/60 border-b border-default text-[11px] font-medium uppercase tracking-wider text-foreground-lighter">
           <div className="col-span-4">Backup name</div>
           <div className="col-span-2">Type</div>
           <div className="col-span-2">Size</div>
@@ -195,7 +194,7 @@ export function BackupsPageView() {
         </div>
         {loading && filtered.length > 0 && <LoadingIndicator label="Refreshing backups" className="py-6" size={20} />}
         {filtered.map(backup => (
-          <div key={backup.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center border-b border-default last:border-b-0 hover:bg-surface-200/40 transition-colors group text-sm">
+          <div key={backup.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center border-b border-default last:border-b-0 dark:hover:bg-surface-200/40 transition-colors group text-sm">
             <div className="col-span-12 sm:col-span-4 flex items-center gap-2.5 min-w-0">
               <Archive className="h-4 w-4 text-foreground-lighter shrink-0" />
               <div className="min-w-0">
@@ -216,7 +215,7 @@ export function BackupsPageView() {
                     <MoreHorizontal className="h-4 w-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44 bg-surface-100 border-default text-foreground shadow-xl">
+                <DropdownMenuContent align="end" className="w-44 bg-surface-100 border-default text-foreground shadow-none">
                   <DropdownMenuItem disabled={!backup.available || !!busy} title={!backup.available ? 'Backup archive is missing from storage' : undefined} onSelect={() => void handleDownload(backup)} className="text-xs gap-2 cursor-pointer">
                     <Download className="h-3.5 w-3.5 text-foreground-lighter" />Download SQL dump
                   </DropdownMenuItem>
@@ -245,7 +244,7 @@ export function BackupsPageView() {
 
       {/* Create Backup Dialog — original fields; unsupported retention remains visible and disabled */}
       <Dialog open={createOpen} onOpenChange={open => { if (!busy) setCreateOpen(open) }}>
-        <DialogContent className="max-w-md p-6 bg-surface-100 border-default text-foreground shadow-2xl rounded-lg">
+        <DialogContent className="max-w-md p-6 bg-surface-100 border-default text-foreground shadow-none rounded-lg [&_button]:shadow-none">
           <form onSubmit={handleCreate}>
             <DialogHeader className="pb-3 border-b border-default text-left">
               <DialogTitle className="text-base font-semibold text-foreground flex items-center gap-2"><Archive className="h-4 w-4 text-foreground-lighter" />Create database backup</DialogTitle>
@@ -258,9 +257,9 @@ export function BackupsPageView() {
             {error && <p role="alert" className="mb-3 text-xs text-destructive">{error}</p>}
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">
               <button type="button" onClick={() => setCreateOpen(false)} disabled={!!busy} className="px-3 py-1.5 text-xs font-medium text-foreground-lighter hover:text-foreground hover:bg-surface-200 rounded-md transition-colors">Cancel</button>
-              <button type="submit" disabled={!newBackupName.trim() || !!busy} className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-foreground bg-surface-300 hover:bg-surface-200 disabled:opacity-50 disabled:pointer-events-none border border-strong rounded-md transition-colors shadow-xs">
+              <Button type="submit" variant="primary" size="small" disabled={!newBackupName.trim() || !!busy} className="gap-1.5 font-medium shadow-none">
                 {busy === 'create' ? <><Spinner size={14} decorative />Creating backup...</> : 'Create backup'}
-              </button>
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -268,7 +267,7 @@ export function BackupsPageView() {
 
       {/* Restore Confirmation Dialog — target DB selection and typed confirmation protect real restore */}
       <Dialog open={restoreOpen} onOpenChange={open => { if (!open && !busy) dismissRestore() }}>
-        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden" onEscapeKeyDown={event => busy && event.preventDefault()} onPointerDownOutside={event => busy && event.preventDefault()}>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden shadow-none [&_button]:shadow-none" onEscapeKeyDown={event => busy && event.preventDefault()} onPointerDownOutside={event => busy && event.preventDefault()}>
           <form onSubmit={handleRestore}>
             {error && <p role="alert" className="mx-5 mt-4 text-xs text-destructive">{error}</p>}
             <div className="px-5 py-4 border-b border-default"><DialogTitle className="text-sm font-medium pr-6 flex items-center gap-2"><RotateCcw className="h-4 w-4 text-amber-500 shrink-0" />Confirm restore of backup &quot;{targetBackup?.label}&quot;</DialogTitle></div>
@@ -287,7 +286,7 @@ export function BackupsPageView() {
         setDeleteOpen(open)
         if (!open) { setTargetBackup(null); setConfirmation('') }
       }}>
-        <DialogContent className="bg-surface-100 border-default text-foreground sm:max-w-md">
+        <DialogContent className="bg-surface-100 border-default text-foreground sm:max-w-md shadow-none [&_button]:shadow-none">
           <form onSubmit={event => void handleDelete(event)} className="space-y-4">
             <DialogHeader>
               <DialogTitle>Delete backup &quot;{targetBackup?.label}&quot;?</DialogTitle>
