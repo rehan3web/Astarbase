@@ -30,6 +30,7 @@ import { verifyStorageAndBackups } from './backups.browser'
 import { pipeline } from 'node:stream/promises'
 import { verifyVisualizerCopy } from './visualizer-copy.browser'
 import { verifySqlExecutionFeedback } from './sql-results.browser'
+import { verifySqlScroll } from './sql-scroll.browser'
 import { verifyDatabaseMaintenance } from './database-maintenance.browser'
 import { verifyPoliciesUi } from './policies.browser'
 
@@ -190,6 +191,12 @@ try {
     assert.equal((await page.request.get(`${url}/api/studio/branches`)).status(), 200)
     assert.deepEqual(browserErrors, [])
     console.log('PASS: split login layout, social links only, password visibility, invalid credentials, username/email login, logout and HttpOnly session')
+    return
+  }
+  if (process.env.STUDIO_SQL_SCROLL_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifySqlScroll(page, url, setQuery, snapshot)
+    assert.deepEqual(browserErrors, [])
     return
   }
   if (process.env.STUDIO_BRANCH_ACTIONS_ONLY === '1') {

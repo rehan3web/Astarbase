@@ -519,7 +519,7 @@ export function SqlEditorView() {
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-studio">
+    <div className="flex h-full min-h-0 w-full overflow-hidden bg-studio">
       {isSidebarOpen && (
         <SqlSidebar
           snippets={snippets}
@@ -540,7 +540,7 @@ export function SqlEditorView() {
           onDeleteSnippet={(id) => void deleteSnippet(id)}
         />
       )}
-      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
         <SqlTabBar
           snippets={snippets}
           openTabIds={openTabIds}

@@ -118,9 +118,10 @@ export function SqlResultsPane({
 
   return (
     <div
+      data-sql-results-pane
       className={cn(
         isExpanded ? 'h-[28rem]' : 'h-72',
-        'shrink-0 flex flex-col bg-surface-100 overflow-hidden border-t border-default transition-all duration-200 relative'
+        'shrink min-h-0 min-w-0 max-h-[65%] flex flex-col bg-surface-100 overflow-hidden border-t border-default transition-all duration-200 relative'
       )}
     >
       {/* Results Tab Bar */}
@@ -268,7 +269,7 @@ export function SqlResultsPane({
       </div>
 
       {/* Pane Content */}
-      <div className="flex-1 overflow-auto bg-studio">
+      <div data-sql-results-scroll className="flex-1 min-h-0 min-w-0 overflow-auto bg-studio">
         {queryResult?.message && <pre role={queryResult.status === 'error' ? 'alert' : 'status'} className={cn('p-4 text-xs whitespace-pre-wrap', queryResult.status === 'error' ? 'text-red-400' : 'text-foreground-lighter')}>{queryResult.message}</pre>}
         {/* State 1: No query run yet */}
         {!queryResult ? (

@@ -12,7 +12,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 interface SqlCodeEditorProps { value: string; onChange: (value: string) => void }
 export function SqlCodeEditor({ value, onChange }: SqlCodeEditorProps) {
   const { theme } = useTheme()
-  return <div className={`flex-1 min-h-[220px] relative border-b border-default ${theme === 'dark' ? 'bg-[#171717]' : 'bg-[#ffffff]'}`}>
+  return <div className={`flex-1 min-h-0 min-w-0 overflow-hidden relative border-b border-default ${theme === 'dark' ? 'bg-[#171717]' : 'bg-[#ffffff]'}`}>
     <label htmlFor="sql-monaco-editor" className="sr-only">SQL query</label>
     <MonacoEditor
       height="100%"
