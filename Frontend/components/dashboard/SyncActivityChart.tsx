@@ -142,7 +142,7 @@ export function SyncActivityChart({ activity, loading = false }: { activity: Act
                     aria-label={accessibleSummary}
                   >
                     {isHovered && (
-                      <div role="tooltip" className="pointer-events-none absolute -top-[4.5rem] z-30 max-w-[min(24rem,90vw)] rounded-lg border border-strong bg-surface-100 px-2.5 py-1.5 text-[11px] text-foreground shadow-lg">
+                      <div role="tooltip" className="pointer-events-none absolute -top-[4.5rem] z-30 max-w-[min(24rem,90vw)] rounded-lg border border-strong bg-white dark:bg-surface-100 px-2.5 py-1.5 text-[11px] text-foreground shadow-lg">
                         <div className="font-semibold">{time}</div>
                         {values === null ? (
                           <div className="mt-0.5 text-[10px] text-foreground-lighter">No recorded observations</div>

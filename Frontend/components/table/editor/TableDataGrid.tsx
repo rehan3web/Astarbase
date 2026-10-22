@@ -289,7 +289,7 @@ export function TableDataGrid({
                                                             onChange={(e) => setEditValue(e.target.value)}
                                                             onBlur={handleCellSave}
                                                             onKeyDown={handleKeyDown}
-                                                            className="w-full bg-surface-200 text-foreground border border-brand-500 rounded px-1.5 py-0.5 outline-none -mx-1.5 -my-0.5 h-6"
+                                                            className="w-full bg-white dark:bg-surface-200 text-foreground border border-strong rounded px-1.5 py-0.5 outline-none -mx-1.5 -my-0.5 h-6"
                                                         />
                                                     ) : isNull ? (
                                                         <span className="text-foreground-muted italic font-sans text-[11px]">

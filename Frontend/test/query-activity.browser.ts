@@ -26,6 +26,24 @@ export async function verifyQueryActivityUi(page: Page, url: string, database: s
   await expect(chart).toContainText('1 recorded runs')
   await expect(chart.getByRole('status')).toHaveCount(0)
   await snapshot('query-activity-all-clients')
+  for (const theme of ['light', 'dark']) {
+    if (await page.locator('html').getAttribute('data-theme') !== theme) {
+      await page.getByRole('button').filter({ has: page.locator(theme === 'light' ? 'svg.lucide-sun' : 'svg.lucide-moon') }).click()
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+    await chart.getByRole('img').first().hover()
+    const tooltip = chart.getByRole('tooltip')
+    await expect(tooltip).toBeVisible()
+    await expect(tooltip).toContainText('Succeeded:')
+    const background = await tooltip.evaluate(element => getComputedStyle(element).backgroundColor)
+    if (theme === 'light') assert.equal(background, 'rgb(255, 255, 255)')
+    else {
+      const reference = await chart.getByRole('group', { name: 'Activity metric' }).evaluate(element => getComputedStyle(element).backgroundColor)
+      assert.equal(background, reference)
+    }
+    await snapshot(`query-activity-tooltip-${theme}`)
+    await page.getByRole('heading', { name: 'Sync Activity' }).hover()
+  }
   status = 'unavailable'
   await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(chart.getByRole('status')).toHaveText(message)
