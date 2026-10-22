@@ -24,6 +24,8 @@ import { verifyServiceStatus } from './service-status.browser'
 import { verifyTableSurfaces } from './table-surfaces.browser'
 import { verifyTableRowCopy } from './table-row-copy.browser'
 import { verifyInsertSurfaces } from './insert-surfaces.browser'
+import { verifyInsertSave } from './insert-save.browser'
+import { verifyCreateTableColumns } from './create-table-columns.browser'
 import { verifyBranchActions } from './branch-actions.browser'
 import { verifySqlExports } from './sql-export.browser'
 import { verifySqlLibrary } from './sql-library.browser'
@@ -230,6 +232,19 @@ try {
   if (process.env.STUDIO_BRANCH_ACTIONS_ONLY === '1') {
     await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
     await verifyBranchActions(page, url, services, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+  if (process.env.STUDIO_CREATE_TABLE_COLUMNS_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifyCreateTableColumns(page, url, config, snapshot)
+    await verifyInsertSave(page, url, config.DB_NAME, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+  if (process.env.STUDIO_INSERT_SAVE_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifyInsertSave(page, url, config.DB_NAME, snapshot)
     assert.deepEqual(browserErrors, [])
     return
   }

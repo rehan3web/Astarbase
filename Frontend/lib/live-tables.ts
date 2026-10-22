@@ -1,6 +1,7 @@
 import type { TableDefinition } from './mock-data'
 import type { SchemaNode, SchemaEdge, TableRows } from './api'
 import { qi, literal } from './api'
+import { foreignKeyReferenceSql } from './foreign-keys'
 
 export function liveTable(node: SchemaNode | TableRows, edges: SchemaEdge[] = []): TableDefinition {
   return {
@@ -19,7 +20,19 @@ export function liveTable(node: SchemaNode | TableRows, edges: SchemaEdge[] = []
 }
 export function createTableSql(table: TableDefinition) {
   const primary = table.columns.filter(c => c.isPrimaryKey).map(c => qi(c.name))
-  const columns = table.columns.map(c => `${qi(c.name)} ${c.dataType || c.format}${c.isNullable ? '' : ' NOT NULL'}${c.defaultValue ? ` DEFAULT ${c.defaultValue}` : ''}${c.isUnique ? ' UNIQUE' : ''}${c.foreignKey ? ` REFERENCES ${qi(c.foreignKey.targetSchema || table.schema)}.${qi(c.foreignKey.targetTable)}(${qi(c.foreignKey.targetColumn)})` : ''}`)
+  const columns = table.columns.map(c => {
+    const reference = c.foreignKey
+    const foreignKey = !reference ? '' : reference.onDelete !== undefined || reference.onUpdate !== undefined
+      ? ` ${foreignKeyReferenceSql({
+        targetSchema: reference.targetSchema || table.schema,
+        targetTable: reference.targetTable,
+        targetColumn: reference.targetColumn,
+        onDelete: reference.onDelete ?? 'NO ACTION',
+        onUpdate: reference.onUpdate ?? 'NO ACTION',
+      })}`
+      : ` REFERENCES ${qi(reference.targetSchema || table.schema)}.${qi(reference.targetTable)}(${qi(reference.targetColumn)})`
+    return `${qi(c.name)} ${c.dataType || c.format}${c.isNullable ? '' : ' NOT NULL'}${c.defaultValue ? ` DEFAULT ${c.defaultValue}` : ''}${c.isUnique ? ' UNIQUE' : ''}${foreignKey}`
+  })
   if (primary.length) columns.push(`PRIMARY KEY (${primary.join(',')})`)
   const name = `${qi(table.schema)}.${qi(table.name)}`
   return `CREATE TABLE ${name} (${columns.join(',')});${table.comment ? ` COMMENT ON TABLE ${name} IS ${literal(table.comment)};` : ''}${table.rlsEnabled ? ` ALTER TABLE ${name} ENABLE ROW LEVEL SECURITY;` : ''}`

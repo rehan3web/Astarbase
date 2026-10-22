@@ -1,11 +1,14 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { Plus, Trash2, X } from 'lucide-react'
+import { GripVertical, Link2, Plus, Settings2, X } from 'lucide-react'
 import { TableDefinition, ColumnDefinition } from '@/lib/mock-data'
+import type { ForeignKeyDraft } from '@/lib/foreign-keys'
 import { cn } from '@/lib/utils'
-import { PrimaryKeyIcon } from '@/components/ui/primary-key-icon'
+import { Spinner } from '@/components/ui/spinner'
+import { useInsertSave } from './useInsertSave'
+import { ForeignKeyPanel } from './ForeignKeyPanel'
 import {
   Select,
   SelectContent,
@@ -13,12 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 interface InsertTableModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   schemaName: string
-  onInsertTable: (newTable: TableDefinition) => void
+  onInsertTable: (newTable: TableDefinition) => Promise<boolean>
 }
 
 interface TempColumn {
@@ -28,106 +32,104 @@ interface TempColumn {
   defaultValue: string
   isPrimaryKey: boolean
   isNullable: boolean
-  isArray?: boolean
+  isArray: boolean
+  foreignKey: ForeignKeyDraft | null
 }
 
-export function InsertTableModal({
-  open,
-  onOpenChange,
-  schemaName,
-  onInsertTable,
-}: InsertTableModalProps) {
+const makeInitialColumns = (): TempColumn[] => [
+  { id: 'column-id', name: 'id', type: 'int8', defaultValue: '', isPrimaryKey: true, isNullable: false, isArray: false, foreignKey: null },
+  { id: 'column-created-at', name: 'created_at', type: 'timestamptz', defaultValue: 'now()', isPrimaryKey: false, isNullable: false, isArray: false, foreignKey: null },
+]
+
+const typeOptions = [
+  ['text', 'text'], ['varchar', 'varchar'], ['int2', 'int2 (smallint)'],
+  ['int4', 'int4 (integer)'], ['int8', 'int8 (bigint)'], ['float4', 'float4 (real)'],
+  ['float8', 'float8 (double precision)'], ['numeric', 'numeric'], ['uuid', 'uuid'],
+  ['boolean', 'boolean'], ['json', 'json'], ['jsonb', 'jsonb'], ['date', 'date'],
+  ['time', 'time'], ['timestamptz', 'timestamptz'],
+]
+
+export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable }: InsertTableModalProps) {
+  const { saving, save } = useInsertSave()
   const [tableName, setTableName] = useState('')
   const [tableDescription, setTableDescription] = useState('')
   const [enableRls, setEnableRls] = useState(true)
-  const [enableRealtime, setEnableRealtime] = useState(false)
-  const [columns, setColumns] = useState<TempColumn[]>([
-    {
-      id: 'col-1',
-      name: 'id',
-      type: 'int8',
-      defaultValue: '',
-      isPrimaryKey: true,
-      isNullable: false,
-    },
-    {
-      id: 'col-2',
-      name: 'created_at',
-      type: 'timestamptz',
-      defaultValue: 'now()',
-      isPrimaryKey: false,
-      isNullable: false,
-    },
-  ])
+  const [columns, setColumns] = useState<TempColumn[]>(makeInitialColumns)
+  const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null)
+  const [foreignKeyOpen, setForeignKeyOpen] = useState(false)
+  const [foreignKeySourceId, setForeignKeySourceId] = useState<string | null>(null)
+  const idSequence = useRef(0)
+  const draggedColumnId = useRef<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (open) {
-      setTimeout(() => nameInputRef.current?.focus(), 150)
-      setTableName('')
-      setTableDescription('')
-      setEnableRls(true)
-      setEnableRealtime(false)
-      setColumns([
-        {
-          id: 'col-1',
-          name: 'id',
-          type: 'int8',
-          defaultValue: '',
-          isPrimaryKey: true,
-          isNullable: false,
-        },
-        {
-          id: 'col-2',
-          name: 'created_at',
-          type: 'timestamptz',
-          defaultValue: 'now()',
-          isPrimaryKey: false,
-          isNullable: false,
-        },
-      ])
-    }
+    if (!open) return
+    setTimeout(() => nameInputRef.current?.focus(), 150)
+    setTableName('')
+    setTableDescription('')
+    setEnableRls(true)
+    setColumns(makeInitialColumns())
+    setSettingsColumnId(null)
+    setForeignKeyOpen(false)
+    setForeignKeySourceId(null)
   }, [open])
 
   const handleAddColumn = () => {
-    setColumns((prev) => [
-      ...prev,
-      {
-        id: `col-${Date.now()}`,
-        name: `column_${prev.length + 1}`,
-        type: 'text',
-        defaultValue: '',
-        isPrimaryKey: false,
-        isNullable: true,
-      },
-    ])
+    idSequence.current += 1
+    setColumns((previous) => [...previous, {
+      id: `column-${Date.now()}-${idSequence.current}`,
+      name: `column_${previous.length + 1}`,
+      type: 'text',
+      defaultValue: '',
+      isPrimaryKey: false,
+      isNullable: true,
+      isArray: false,
+      foreignKey: null,
+    }])
   }
 
   const handleRemoveColumn = (id: string) => {
-    if (columns.length <= 1) return
-    setColumns((prev) => prev.filter((c) => c.id !== id))
+    setColumns((previous) => previous.length > 1 ? previous.filter((column) => column.id !== id) : previous)
+    if (settingsColumnId === id) setSettingsColumnId(null)
+    if (foreignKeySourceId === id) {
+      setForeignKeySourceId(null)
+      setForeignKeyOpen(false)
+    }
   }
 
-  const handleUpdateColumn = (id: string, updates: Partial<TempColumn>) => {
-    setColumns((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
-    )
+  const updateColumn = (id: string, updates: Partial<TempColumn>) => {
+    setColumns((previous) => previous.map((column) => column.id === id ? { ...column, ...updates } : column))
   }
 
-  const handleSave = useCallback(() => {
-    if (!tableName.trim()) return
+  const reorderColumn = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return
+    setColumns((previous) => {
+      const sourceIndex = previous.findIndex((column) => column.id === sourceId)
+      const targetIndex = previous.findIndex((column) => column.id === targetId)
+      if (sourceIndex < 0 || targetIndex < 0) return previous
+      const reordered = [...previous]
+      const [moved] = reordered.splice(sourceIndex, 1)
+      reordered.splice(targetIndex, 0, moved)
+      return reordered
+    })
+  }
 
-    const tableCols: ColumnDefinition[] = columns.map((c) => ({
-      id: c.id,
-      name: c.name.trim().toLowerCase() || 'column',
-      format: c.type,
-      dataType: c.type,
-      isPrimaryKey: c.isPrimaryKey,
-      isNullable: c.isNullable,
-      defaultValue: c.defaultValue || null,
-      description: '',
-    }))
-
+  const handleSave = useCallback(async () => {
+    if (settingsColumnId || foreignKeyOpen || saving || !tableName.trim()) return
+    const tableCols: ColumnDefinition[] = columns.map((column) => {
+      const submittedType = `${column.type}${column.isArray ? '[]' : ''}`
+      return {
+        id: column.id,
+        name: column.name.trim().toLowerCase() || 'column',
+        format: submittedType,
+        dataType: submittedType,
+        isPrimaryKey: column.isPrimaryKey,
+        isNullable: column.isNullable,
+        defaultValue: column.defaultValue || null,
+        description: '',
+        ...(column.foreignKey ? { foreignKey: column.foreignKey } : {}),
+      }
+    })
     const newTable: TableDefinition = {
       id: `tbl-${Date.now()}`,
       name: tableName.trim().toLowerCase(),
@@ -138,350 +140,215 @@ export function InsertTableModal({
       columns: tableCols,
       rows: [],
     }
+    await save(() => onInsertTable(newTable))
+  }, [columns, enableRls, foreignKeyOpen, onInsertTable, save, saving, schemaName, settingsColumnId, tableDescription, tableName])
 
-    onInsertTable(newTable)
-  }, [tableName, tableDescription, enableRls, columns, schemaName, onInsertTable, onOpenChange])
-
-  // Keyboard shortcut Ctrl+Enter to save
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault()
-        handleSave()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        if (foreignKeyOpen || settingsColumnId || saving) return
+        event.preventDefault()
+        void handleSave()
       }
     }
-    if (open) {
-      window.addEventListener('keydown', handleKeyDown)
-    }
+    if (open) window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open, handleSave])
+  }, [foreignKeyOpen, handleSave, open, saving, settingsColumnId])
+
+  const activeForeignKeyColumn = columns.find((column) => column.id === foreignKeySourceId)
+  const localSources = columns.map(({ id, name, type, isArray }) => ({ id, name, type: `${type}${isArray ? '[]' : ''}` }))
+  const openForeignKeyEditor = (sourceId?: string) => {
+    setForeignKeySourceId(sourceId ?? foreignKeySourceId ?? columns[0]?.id ?? null)
+    setSettingsColumnId(null)
+    setForeignKeyOpen(true)
+  }
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next) }}>
       <DialogPrimitive.Portal>
-        {/* Dimmed backdrop overlay */}
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-
-        {/* Slide-over Right Panel */}
-        <DialogPrimitive.Content
-          className={cn(
-            'fixed inset-y-0 right-0 z-50 h-full w-full max-w-2xl bg-white dark:bg-surface-100 border-l border-gray-200 dark:border-default shadow-2xl flex flex-col outline-none select-none',
-            'duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out',
-            'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right'
-          )}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-default shrink-0">
+        <DialogPrimitive.Content className={cn(
+          'fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-4xl flex-col border-l border-gray-200 dark:border-default bg-white dark:bg-surface-100 text-foreground shadow-2xl outline-none',
+          'duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right'
+        )}>
+          <header className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-default px-6 py-4">
             <div className="flex items-center gap-2">
-              <DialogPrimitive.Title className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <span>Create a new table</span>
-                <span className="font-mono text-xs px-2 py-0.5 rounded bg-white dark:bg-surface-200 text-foreground-lighter border border-gray-300 dark:border-strong font-normal">
-                  schema: {schemaName}
-                </span>
-              </DialogPrimitive.Title>
+              <DialogPrimitive.Title className="text-sm font-semibold">Create a new table</DialogPrimitive.Title>
+              <span className="rounded border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 px-2 py-0.5 font-mono text-xs text-foreground-lighter">schema: {schemaName}</span>
             </div>
-            <DialogPrimitive.Close className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-gray-100 dark:hover:bg-surface-200 transition-colors cursor-pointer">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
+            <DialogPrimitive.Close disabled={saving} className="rounded-md p-1.5 text-foreground-lighter hover:bg-gray-100 dark:hover:bg-surface-200 hover:text-foreground">
+              <X className="h-4 w-4" /><span className="sr-only">Close</span>
             </DialogPrimitive.Close>
-          </div>
+          </header>
 
-          {/* Scrollable Form Body matching InsertColumnModal layout */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-gray-200 dark:divide-default">
-            {/* 1. General Section */}
-            <div className="grid grid-cols-12 gap-4 py-5 items-start first:pt-0">
-              <div className="col-span-4">
+          <fieldset disabled={saving} className="min-w-0 flex-1 overflow-y-auto divide-y divide-gray-200 dark:divide-default px-6 py-5">
+            <section className="grid grid-cols-12 items-start gap-4 py-5 first:pt-0">
+              <div className="col-span-12 md:col-span-4">
                 <span className="text-xs font-medium text-foreground-lighter">General</span>
               </div>
-              <div className="col-span-8 space-y-4">
+              <div className="col-span-12 space-y-4 md:col-span-8">
                 <div>
-                  <label className="text-xs text-foreground block mb-1 font-medium">
-                    Name <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    ref={nameInputRef}
-                    value={tableName}
-                    onChange={(e) => setTableName(e.target.value)}
-                    placeholder="e.g. products"
-                    className="w-full h-8 px-3 rounded-md bg-white dark:bg-surface-200 border border-gray-300 dark:border-strong text-foreground text-xs font-mono outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
-                  />
-                  <p className="text-[11px] text-foreground-lighter mt-1 leading-relaxed">
-                    Recommended to use lowercase and use an underscore to separate words e.g.{' '}
-                    <code className="text-foreground font-mono bg-white dark:bg-surface-200 px-1 py-0.5 rounded text-[10px]">
-                      table_name
-                    </code>
-                  </p>
+                  <label className="mb-1 block text-xs font-medium">Name <span className="text-destructive">*</span></label>
+                  <input ref={nameInputRef} value={tableName} onChange={(event) => setTableName(event.target.value)} placeholder="e.g. products" className="h-8 w-full rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 px-3 font-mono text-xs outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200" />
+                  <p className="mt-1 text-[11px] text-foreground-lighter">Use lowercase names and underscores, for example <code className="font-mono text-foreground">table_name</code>.</p>
                 </div>
-
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs text-foreground font-medium">Description</label>
-                    <span className="text-[11px] text-foreground-lighter">Optional</span>
-                  </div>
-                  <input
-                    value={tableDescription}
-                    onChange={(e) => setTableDescription(e.target.value)}
-                    placeholder="Optional description"
-                    className="w-full h-8 px-3 rounded-md bg-white dark:bg-surface-200 border border-gray-300 dark:border-strong text-foreground text-xs outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
-                  />
+                  <label className="mb-1 block text-xs font-medium">Description <span className="text-[11px] font-normal text-foreground-lighter">Optional</span></label>
+                  <input value={tableDescription} onChange={(event) => setTableDescription(event.target.value)} placeholder="Optional description" className="h-8 w-full rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 px-3 text-xs outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200" />
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* 2. Row Level Security (RLS) Section - Same Switch styling as InsertColumnModal */}
-            <div className="grid grid-cols-12 gap-4 py-5 items-start">
-              <div className="col-span-4 space-y-1">
-                <span className="text-xs font-medium text-foreground-lighter block">
-                  Row Level Security
-                </span>
-                <span className="text-[11px] text-foreground-muted block leading-relaxed">
-                  Policies restrict access to data rows for authenticated or anonymous users.
-                </span>
+            <section className="grid grid-cols-12 items-start gap-4 py-5">
+              <div className="col-span-12 space-y-1 md:col-span-4">
+                <span className="block text-xs font-medium text-foreground-lighter">Row Level Security</span>
+                <span className="block text-[11px] leading-relaxed text-foreground-muted">Policies restrict access to data rows.</span>
               </div>
-
-              <div className="col-span-8 space-y-5">
-                {/* Enable RLS */}
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="text-xs font-medium text-foreground block">
-                      Enable Row Level Security (RLS)
-                    </span>
-                    <span className="text-[11px] text-foreground-lighter leading-relaxed block">
-                      Restricts access to rows in this table by applying PostgreSQL security policies.
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={enableRls}
-                    onClick={() => setEnableRls(!enableRls)}
-                    className={cn(
-                      'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                      enableRls ? 'bg-[#086E43]' : 'bg-surface-300'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
-                        enableRls ? 'translate-x-4' : 'translate-x-0'
-                      )}
-                    />
+              <div className="col-span-12 md:col-span-8">
+                <label className="flex items-center justify-between gap-4">
+                  <span className="text-xs font-medium">Enable Row Level Security (RLS)</span>
+                  <button type="button" role="switch" aria-checked={enableRls} onClick={() => setEnableRls((value) => !value)} className={cn('relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors', enableRls ? 'bg-[#086E43]' : 'bg-surface-300')}>
+                    <span className={cn('inline-block h-4 w-4 rounded-full bg-white shadow transition-transform', enableRls ? 'translate-x-4' : 'translate-x-0')} />
                   </button>
-                </div>
+                </label>
+                <p className="mt-1 text-[11px] leading-relaxed text-foreground-lighter">Restricts access to rows through PostgreSQL security policies.</p>
+              </div>
+            </section>
 
-                {/* Enable Realtime */}
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="text-xs font-medium text-foreground block">
-                      Enable Realtime
-                    </span>
-                    <span className="text-[11px] text-foreground-lighter leading-relaxed block">
-                      Broadcast changes on this table to authorized subscribers in real-time.
-                    </span>
+            <section className="py-5">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xs font-medium text-foreground-lighter">Columns</h2>
+                  <p className="mt-1 text-[11px] text-foreground-muted">Define the fields in this table. An id primary key is included by default.</p>
+                </div>
+                <button type="button" onClick={() => openForeignKeyEditor()} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 px-3 text-xs font-medium hover:bg-gray-100 dark:hover:bg-surface-300">
+                  <Link2 className="h-3.5 w-3.5" /> Add foreign key relationship{columns.some((column) => column.foreignKey) ? ` · ${columns.filter((column) => column.foreignKey).length}` : ''}
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="min-w-[690px]">
+                  <div className="grid grid-cols-[28px_minmax(150px,1.15fr)_minmax(150px,1fr)_minmax(130px,.95fr)_64px_76px] items-center gap-2 px-2 pb-2 text-[11px] font-medium text-foreground-lighter">
+                    <span aria-hidden="true" />
+                    <span>Name</span><span>Type</span><span>Default value</span><span className="text-center">Primary</span><span className="sr-only">Settings</span>
                   </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={enableRealtime}
-                    onClick={() => setEnableRealtime(!enableRealtime)}
-                    className={cn(
-                      'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                      enableRealtime ? 'bg-[#086E43]' : 'bg-surface-300'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
-                        enableRealtime ? 'translate-x-4' : 'translate-x-0'
-                      )}
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Columns Section - Same Select component as InsertColumnModal */}
-            <div className="grid grid-cols-12 gap-4 py-5 items-start">
-              <div className="col-span-4 space-y-2">
-                <span className="text-xs font-medium text-foreground-lighter block">
-                  Columns
-                </span>
-                <span className="text-[11px] text-foreground-muted block leading-relaxed">
-                  Specify the columns for this table. An id primary key is included by default.
-                </span>
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={handleAddColumn}
-                    className="w-full px-2.5 py-1.5 text-xs rounded border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 hover:bg-gray-100 dark:hover:bg-surface-300 text-foreground transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-medium"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add column</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="col-span-8 space-y-3">
-                {columns.map((col, idx) => (
-                  <div
-                    key={col.id}
-                    className="p-3 rounded-md border border-gray-200 dark:border-default bg-white dark:bg-surface-200/50 space-y-3"
-                  >
-                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-default pb-2">
-                      <span className="text-xs font-medium text-foreground flex items-center gap-1.5 font-mono">
-                        {col.isPrimaryKey && <PrimaryKeyIcon className="h-3 w-3 text-amber-400" />}
-                        <span>{col.name || `Column ${idx + 1}`}</span>
-                      </span>
-                      {columns.length > 1 && (
+                  <div className="space-y-1">
+                    {columns.map((column) => (
+                      <div
+                        key={column.id}
+                        data-column-row={column.id}
+                        onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          if (draggedColumnId.current) reorderColumn(draggedColumnId.current, column.id)
+                          draggedColumnId.current = null
+                        }}
+                        className="group grid grid-cols-[28px_minmax(150px,1.15fr)_minmax(150px,1fr)_minmax(130px,.95fr)_64px_76px] items-center gap-2 rounded-lg border border-transparent px-2 py-2 transition-colors hover:border-gray-200 hover:bg-gray-50 dark:hover:border-default dark:hover:bg-surface-200/60"
+                      >
                         <button
                           type="button"
-                          onClick={() => handleRemoveColumn(col.id)}
-                          className="p-1 rounded text-foreground-lighter hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                          title="Remove column"
+                          draggable
+                          aria-label={`Reorder ${column.name}`}
+                          title="Drag to reorder · Alt + Arrow Up/Down to move"
+                          onDragStart={(event) => {
+                            draggedColumnId.current = column.id
+                            event.dataTransfer.effectAllowed = 'move'
+                            event.dataTransfer.setData('text/plain', column.id)
+                          }}
+                          onDragEnd={() => { draggedColumnId.current = null }}
+                          onKeyDown={(event) => {
+                            if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+                            const currentIndex = columns.findIndex((item) => item.id === column.id)
+                            const target = columns[currentIndex + (event.key === 'ArrowUp' ? -1 : 1)]
+                            if (!target) return
+                            event.preventDefault()
+                            reorderColumn(column.id, target.id)
+                          }}
+                          className="flex h-8 w-7 cursor-grab items-center justify-center rounded text-foreground-lighter hover:bg-white hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 active:cursor-grabbing dark:hover:bg-surface-300"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <GripVertical className="h-4 w-4" />
                         </button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] text-foreground-lighter block mb-1 font-medium">
-                          Name
-                        </label>
-                        <input
-                          value={col.name}
-                          onChange={(e) =>
-                            handleUpdateColumn(col.id, { name: e.target.value })
-                          }
-                          placeholder="Column name"
-                          className="w-full h-8 px-2.5 text-xs bg-white dark:bg-surface-100 border border-gray-300 dark:border-strong rounded text-foreground font-mono placeholder:text-foreground-lighter focus:outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
-                        />
-                      </div>
-
-                      {/* Custom Select matching InsertColumnModal exactly */}
-                      <div>
-                        <label className="text-[11px] text-foreground-lighter block mb-1 font-medium">
-                          Type
-                        </label>
-                        <Select
-                          value={col.type}
-                          onValueChange={(val) =>
-                            handleUpdateColumn(col.id, { type: val })
-                          }
-                        >
-                          <SelectTrigger className="w-full h-8 text-xs font-mono bg-white dark:bg-surface-100 border border-gray-300 dark:border-strong hover:bg-white dark:hover:bg-surface-300/60 focus:border-gray-400 dark:focus:border-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0">
-                            <SelectValue placeholder="Select type..." />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-56">
-                            <SelectItem value="text">text</SelectItem>
-                            <SelectItem value="varchar">varchar</SelectItem>
-                            <SelectItem value="int2">int2 (smallint)</SelectItem>
-                            <SelectItem value="int4">int4 (integer)</SelectItem>
-                            <SelectItem value="int8">int8 (bigint)</SelectItem>
-                            <SelectItem value="float4">float4 (real)</SelectItem>
-                            <SelectItem value="float8">float8 (double precision)</SelectItem>
-                            <SelectItem value="numeric">numeric</SelectItem>
-                            <SelectItem value="uuid">uuid</SelectItem>
-                            <SelectItem value="boolean">boolean</SelectItem>
-                            <SelectItem value="json">json</SelectItem>
-                            <SelectItem value="jsonb">jsonb</SelectItem>
-                            <SelectItem value="date">date</SelectItem>
-                            <SelectItem value="time">time</SelectItem>
-                            <SelectItem value="timestamptz">timestamptz</SelectItem>
-                          </SelectContent>
+                        <div className="relative flex min-w-0 items-center">
+                          <input aria-label="Column name" value={column.name} onChange={(event) => updateColumn(column.id, { name: event.target.value })} placeholder="column_name" className="h-10 min-w-0 w-full rounded-lg border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 py-2 pl-3 pr-9 font-mono text-xs outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200" />
+                          <button type="button" title={column.foreignKey ? 'Edit foreign key' : 'Add foreign key'} aria-label={column.foreignKey ? `Edit foreign key for ${column.name}` : `Add foreign key for ${column.name}`} onClick={() => openForeignKeyEditor(column.id)} className={cn('absolute right-2 rounded p-1 transition-colors hover:bg-gray-100 dark:hover:bg-surface-300', column.foreignKey ? 'text-[#086E43]' : 'text-foreground-lighter')}>
+                            <Link2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <Select value={column.type} onValueChange={(value) => updateColumn(column.id, { type: value })}>
+                          <SelectTrigger aria-label={`Type for ${column.name}`} className="h-10 w-full rounded-lg border-gray-300 dark:border-strong bg-white dark:bg-surface-200 font-mono text-xs hover:bg-white dark:hover:bg-surface-300/60 focus:bg-white dark:focus:bg-surface-200 focus:border-gray-400 dark:focus:border-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0"><SelectValue placeholder="Select type…" /></SelectTrigger>
+                          <SelectContent className="max-h-56">{typeOptions.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
                         </Select>
+                        <input aria-label={`Default value for ${column.name}`} value={column.defaultValue} onChange={(event) => updateColumn(column.id, { defaultValue: event.target.value })} placeholder="NULL" className="h-10 w-full rounded-lg border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 px-3 font-mono text-xs outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200" />
+                        <div className="flex justify-center">
+                          <input type="checkbox" aria-label={`Primary key ${column.name}`} checked={column.isPrimaryKey} onChange={(event) => updateColumn(column.id, { isPrimaryKey: event.target.checked, isNullable: event.target.checked ? false : column.isNullable })} className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-[#086E43] focus:ring-gray-300" />
+                        </div>
+                        <div className="flex items-center justify-end gap-1">
+                          <Popover open={settingsColumnId === column.id} onOpenChange={(isOpen) => setSettingsColumnId(isOpen ? column.id : null)}>
+                            <PopoverTrigger asChild>
+                              <button type="button" aria-label={`Settings for ${column.name}`} aria-expanded={settingsColumnId === column.id} className={cn('rounded-md border p-2 transition-colors', settingsColumnId === column.id ? 'border-gray-400 bg-gray-100 dark:bg-surface-300' : 'border-transparent text-foreground-lighter hover:border-gray-300 hover:bg-white dark:hover:border-strong dark:hover:bg-surface-200')}>
+                              <Settings2 className="h-4 w-4" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" side="bottom" className="w-60 border-gray-200 bg-white p-3 text-foreground dark:border-default dark:bg-surface-100" onKeyDown={(event) => event.stopPropagation()}>
+                                <div className="mb-2 flex items-center justify-between">
+                                  <h3 className="text-xs font-semibold">Column settings</h3>
+                                  <button type="button" aria-label="Close column settings" onClick={() => setSettingsColumnId(null)} className="rounded p-1 text-foreground-lighter hover:bg-gray-100 dark:hover:bg-surface-200"><X className="h-3.5 w-3.5" /></button>
+                                </div>
+                                <label className="flex cursor-pointer items-start gap-2 border-t border-gray-200 dark:border-default py-2">
+                                  <input type="checkbox" checked={column.isNullable} disabled={column.isPrimaryKey} onChange={(event) => updateColumn(column.id, { isNullable: event.target.checked })} className="mt-0.5 h-4 w-4 accent-[#086E43]" />
+                                  <span><span className="block text-xs font-medium">Nullable</span><span className="text-[10px] text-foreground-lighter">Allow NULL values{column.isPrimaryKey ? ' · primary keys are not nullable' : ''}</span></span>
+                                </label>
+                                <label className="flex cursor-pointer items-start gap-2 border-t border-gray-200 dark:border-default py-2">
+                                  <input type="checkbox" checked={column.isArray} onChange={(event) => updateColumn(column.id, { isArray: event.target.checked })} className="mt-0.5 h-4 w-4 accent-[#086E43]" />
+                                  <span><span className="block text-xs font-medium">Array</span><span className="text-[10px] text-foreground-lighter">Submit as {column.type}[]</span></span>
+                                </label>
+                                {column.foreignKey && (
+                                  <button type="button" onClick={() => updateColumn(column.id, { foreignKey: null })} className="flex w-full items-center gap-2 border-t border-gray-200 dark:border-default pt-2 text-left text-xs text-destructive hover:text-destructive/80">
+                                    <X className="h-3.5 w-3.5" />Remove foreign key mapping
+                                  </button>
+                                )}
+                            </PopoverContent>
+                          </Popover>
+                          <button type="button" aria-label={`Remove ${column.name}`} title="Remove column" onClick={() => handleRemoveColumn(column.id)} disabled={columns.length <= 1} className="rounded-md p-2 text-foreground-lighter transition-colors hover:bg-red-50 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-35 dark:hover:bg-destructive/10">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] text-foreground-lighter block mb-1 font-medium">
-                        Default Value
-                      </label>
-                      <input
-                        value={col.defaultValue}
-                        onChange={(e) =>
-                          handleUpdateColumn(col.id, { defaultValue: e.target.value })
-                        }
-                        placeholder="NULL or expression e.g. now()"
-                        className="w-full h-8 px-2.5 text-xs bg-white dark:bg-surface-100 border border-gray-300 dark:border-strong rounded text-foreground font-mono placeholder:text-foreground-lighter focus:outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-6 pt-1">
-                      {/* Is Primary Key Switch */}
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={col.isPrimaryKey}
-                          onClick={() =>
-                            handleUpdateColumn(col.id, { isPrimaryKey: !col.isPrimaryKey })
-                          }
-                          className={cn(
-                            'relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                            col.isPrimaryKey ? 'bg-[#086E43]' : 'bg-surface-300'
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              'pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
-                              col.isPrimaryKey ? 'translate-x-3' : 'translate-x-0'
-                            )}
-                          />
-                        </button>
-                        <span className="text-[11px] font-medium text-foreground">Primary Key</span>
-                      </label>
-
-                      {/* Allow Nullable Switch */}
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={col.isNullable}
-                          onClick={() =>
-                            handleUpdateColumn(col.id, { isNullable: !col.isNullable })
-                          }
-                          className={cn(
-                            'relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                            col.isNullable ? 'bg-[#086E43]' : 'bg-surface-300'
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              'pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
-                              col.isNullable ? 'translate-x-3' : 'translate-x-0'
-                            )}
-                          />
-                        </button>
-                        <span className="text-[11px] font-medium text-foreground">Allow Nullable</span>
-                      </label>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          </div>
+              <button type="button" onClick={handleAddColumn} className="mt-3 flex min-h-[58px] w-full items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-strong bg-white dark:bg-surface-100 text-xs font-medium text-foreground transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-200">
+                <span className="inline-flex items-center gap-2 rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 px-3 py-1.5 shadow-xs"><Plus className="h-3.5 w-3.5" />Add column</span>
+              </button>
+            </section>
+          </fieldset>
 
-          {/* Sticky Bottom Action Toolbar - Matching InsertRowModal / InsertColumnModal */}
-          <div className="sticky bottom-0 bg-white dark:bg-surface-100 border-t border-gray-200 dark:border-default px-6 py-4 flex items-center justify-end gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="px-3.5 py-1.5 rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-100 hover:bg-gray-100 dark:hover:bg-surface-200 text-foreground text-xs font-medium transition-colors cursor-pointer"
-            >
-              Cancel
+          <footer className="sticky bottom-0 flex shrink-0 items-center justify-end gap-2 border-t border-gray-200 dark:border-default bg-white dark:bg-surface-100 px-6 py-4">
+            <button type="button" disabled={saving} onClick={() => onOpenChange(false)} className="rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-100 px-3.5 py-1.5 text-xs font-medium transition-colors hover:bg-gray-100 dark:hover:bg-surface-200 disabled:opacity-50">Cancel</button>
+            <button type="button" disabled={saving || !tableName.trim() || !!settingsColumnId || foreignKeyOpen} aria-busy={saving} onClick={() => void handleSave()} className="flex items-center gap-1.5 rounded-md border border-[#338161] bg-[#086E43] px-4 py-1.5 text-xs font-medium text-white shadow-xs transition-colors hover:bg-[#065836] disabled:cursor-not-allowed disabled:opacity-50">
+              {saving && <Spinner size={14} decorative />}<span>{saving ? 'Saving…' : 'Save'}</span>{!saving && <span className="font-mono text-[10px] opacity-75">Ctrl ↵</span>}
             </button>
-            <button
-              type="button"
-              disabled={!tableName.trim()}
-              onClick={handleSave}
-              className="px-4 py-1.5 rounded-md bg-[#086E43] hover:bg-[#065836] border border-[#338161] text-white text-xs font-medium shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <span>Save</span>
-              <span className="text-[10px] opacity-75 font-mono">Ctrl ↵</span>
-            </button>
-          </div>
+          </footer>
+
+          {activeForeignKeyColumn && (
+            <ForeignKeyPanel
+              key={activeForeignKeyColumn.id}
+              open={open && foreignKeyOpen}
+              onOpenChange={setForeignKeyOpen}
+              tableName={tableName || 'new table'}
+              sourceColumn={activeForeignKeyColumn.name}
+              sourceType={`${activeForeignKeyColumn.type}${activeForeignKeyColumn.isArray ? '[]' : ''}`}
+              initialDraft={activeForeignKeyColumn.foreignKey}
+              sourceColumns={localSources}
+              sourceColumnId={activeForeignKeyColumn.id}
+              onSourceColumnChange={setForeignKeySourceId}
+              onSave={(draft) => {
+                if (foreignKeySourceId) updateColumn(foreignKeySourceId, { foreignKey: draft })
+                setForeignKeyOpen(false)
+              }}
+            />
+          )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

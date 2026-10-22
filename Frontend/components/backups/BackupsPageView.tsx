@@ -242,7 +242,7 @@ export function BackupsPageView() {
         )}
       </div>
 
-      {/* Create Backup Dialog — original fields; unsupported retention remains visible and disabled */}
+      {/* Create Backup Dialog */}
       <Dialog open={createOpen} onOpenChange={open => { if (!busy) setCreateOpen(open) }}>
         <DialogContent className="max-w-md p-6 bg-surface-100 border-default text-foreground shadow-none rounded-lg [&_button]:shadow-none">
           <form onSubmit={handleCreate}>
@@ -252,7 +252,6 @@ export function BackupsPageView() {
             </DialogHeader>
             <div className="py-4 space-y-4">
               <div className="space-y-1.5"><label htmlFor="backup-name" className="text-xs font-medium text-foreground">Backup name <span className="text-destructive">*</span></label><Input id="backup-name" aria-label="Backup name" placeholder="e.g. pre-migration-v2, weekly-snapshot" value={newBackupName} onChange={event => setNewBackupName(event.target.value)} disabled={!!busy} required autoFocus className="bg-surface-200 border-strong text-foreground placeholder:text-foreground-muted text-xs h-9 focus-visible:ring-1 focus-visible:ring-strong focus-visible:border-strong" /></div>
-              <div className="space-y-1.5"><label htmlFor="backup-retention" className="text-xs font-medium text-foreground">Retention policy</label><select id="backup-retention" disabled value="managed" className="w-full bg-surface-200 border border-strong rounded-md text-xs h-9 px-2.5 text-foreground outline-none cursor-not-allowed opacity-60"><option value="managed">Managed by backup service</option></select><p className="text-[11px] text-foreground-muted">Retention options are not exposed by the backup API.</p></div>
             </div>
             {error && <p role="alert" className="mb-3 text-xs text-destructive">{error}</p>}
             <DialogFooter className="pt-3 border-t border-default flex items-center justify-end gap-2">

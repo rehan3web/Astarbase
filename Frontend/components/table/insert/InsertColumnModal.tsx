@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/select'
 import type { ForeignKeyDraft } from '@/lib/foreign-keys'
 import { ForeignKeyPanel } from './ForeignKeyPanel'
+import { Spinner } from '@/components/ui/spinner'
+import { useInsertSave } from './useInsertSave'
 
 interface InsertColumnModalProps {
   open: boolean
@@ -30,7 +32,7 @@ interface InsertColumnModalProps {
     foreignKey?: ForeignKeyDraft | null
   }
   onNewColumnDataChange: (data: any) => void
-  onInsert: (keepOpen?: boolean) => void
+  onInsert: (keepOpen?: boolean) => Promise<boolean>
   /** 'edit' changes the title and hides the "Create more" toggle */
   mode?: 'create' | 'edit'
 }
@@ -44,6 +46,7 @@ export function InsertColumnModal({
   onInsert,
   mode = 'create',
 }: InsertColumnModalProps) {
+  const { saving, save } = useInsertSave()
   const isEdit = mode === 'edit'
   const [createMore, setCreateMore] = useState(false)
   const [foreignKeyOpen, setForeignKeyOpen] = useState(false)
@@ -52,19 +55,20 @@ export function InsertColumnModal({
   // Focus name input on open
   useEffect(() => {
     if (open) {
+      setCreateMore(false)
       setTimeout(() => nameInputRef.current?.focus(), 150)
     }
   }, [open])
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (foreignKeyOpen) return
     if (!newColumnData.name.trim()) return
     const keepOpen = createMore && !isEdit
-    onInsert(keepOpen)
-
-  }, [createMore, foreignKeyOpen, isEdit, newColumnData.name, onInsert])
+    await save(() => onInsert(keepOpen))
+  }, [createMore, foreignKeyOpen, isEdit, newColumnData.name, onInsert, save])
 
   const handleParentOpenChange = (nextOpen: boolean) => {
+    if (saving) return
     if (!nextOpen) setForeignKeyOpen(false)
     onOpenChange(nextOpen)
   }
@@ -107,14 +111,14 @@ export function InsertColumnModal({
                 </span>
               </DialogPrimitive.Title>
             </div>
-            <DialogPrimitive.Close className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-gray-100 dark:hover:bg-surface-200 transition-colors cursor-pointer">
+            <DialogPrimitive.Close disabled={saving} className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-gray-100 dark:hover:bg-surface-200 transition-colors cursor-pointer">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           </div>
 
           {/* Scrollable Form Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-gray-200 dark:divide-default">
+          <fieldset disabled={saving} className="min-w-0 flex-1 overflow-y-auto px-6 py-5 divide-y divide-gray-200 dark:divide-default">
             {/* 1. General Section */}
             <div className="grid grid-cols-12 gap-4 py-5 items-start first:pt-0">
               <div className="col-span-4">
@@ -163,20 +167,6 @@ export function InsertColumnModal({
                 <span className="text-xs font-medium text-foreground-lighter block">
                   Data Type
                 </span>
-                <div className="space-y-1.5 pt-1">
-                  <button
-                    type="button"
-                    className="w-full px-2.5 py-1 text-[11px] rounded border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 hover:bg-gray-100 dark:hover:bg-surface-300 text-foreground transition-colors cursor-pointer text-left font-mono"
-                  >
-                    + Create enum types
-                  </button>
-                  <button
-                    type="button"
-                    className="w-full px-2.5 py-1 text-[11px] rounded border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 hover:bg-gray-100 dark:hover:bg-surface-300 text-foreground transition-colors cursor-pointer text-left"
-                  >
-                    About data types
-                  </button>
-                </div>
               </div>
 
               <div className="col-span-8 space-y-4">
@@ -372,7 +362,7 @@ export function InsertColumnModal({
                 </div>
               </div>
             </div>
-          </div>
+          </fieldset>
 
           {/* Sticky Bottom Action Toolbar */}
           <div className="sticky bottom-0 bg-white dark:bg-surface-100 border-t border-gray-200 dark:border-default px-6 py-4 flex items-center justify-between shrink-0">
@@ -383,6 +373,7 @@ export function InsertColumnModal({
                 type="button"
                 role="switch"
                 aria-checked={createMore}
+                disabled={saving}
                 onClick={() => setCreateMore(!createMore)}
                 className={cn(
                   'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
@@ -404,6 +395,7 @@ export function InsertColumnModal({
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                disabled={saving}
                 onClick={() => onOpenChange(false)}
                 className="px-3.5 py-1.5 rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-100 hover:bg-gray-100 dark:hover:bg-surface-200 text-foreground text-xs font-medium transition-colors cursor-pointer"
               >
@@ -411,12 +403,14 @@ export function InsertColumnModal({
               </button>
               <button
                 type="button"
-                disabled={!newColumnData.name.trim()}
+                disabled={saving || !newColumnData.name.trim()}
+                aria-busy={saving}
                 onClick={handleSave}
                 className="px-4 py-1.5 rounded-md bg-[#086E43] hover:bg-[#065836] border border-[#338161] text-white text-xs font-medium shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                <span>Save</span>
-                <span className="text-[10px] opacity-75 font-mono">Ctrl ↵</span>
+                {saving && <Spinner size={14} decorative />}
+                <span>{saving ? 'Saving…' : 'Save'}</span>
+                {!saving && <span className="text-[10px] opacity-75 font-mono">Ctrl ↵</span>}
               </button>
             </div>
           </div>

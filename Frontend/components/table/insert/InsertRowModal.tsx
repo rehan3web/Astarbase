@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { Spinner } from '@/components/ui/spinner'
+import { useInsertSave } from './useInsertSave'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X, Check } from 'lucide-react'
 import { TableDefinition } from '@/lib/mock-data'
@@ -21,7 +23,7 @@ interface InsertRowModalProps {
   selectedTable: TableDefinition
   newRowData: Record<string, any>
   onNewRowDataChange: (data: Record<string, any>) => void
-  onInsert: (keepOpen?: boolean) => void
+  onInsert: (keepOpen?: boolean) => Promise<boolean>
 }
 
 export function InsertRowModal({
@@ -32,6 +34,7 @@ export function InsertRowModal({
   onNewRowDataChange,
   onInsert,
 }: InsertRowModalProps) {
+  const { saving, save } = useInsertSave()
   const [createMore, setCreateMore] = useState(false)
   const [nullFields, setNullFields] = useState<Record<string, boolean>>({})
   const firstInputRef = useRef<HTMLInputElement>(null)
@@ -39,16 +42,17 @@ export function InsertRowModal({
   // Focus first editable input on open
   useEffect(() => {
     if (open) {
+      setCreateMore(false)
       setTimeout(() => firstInputRef.current?.focus(), 150)
     }
   }, [open])
 
   // Save handler
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     // Check if user has entered data or if we should apply defaults/primary keys
-    onInsert(createMore)
-
-  }, [createMore, onInsert])
+    const success = await save(() => onInsert(createMore))
+    if (success) setNullFields({})
+  }, [createMore, onInsert, save])
 
   // Keyboard shortcut Ctrl+Enter to save, Escape to close
   useEffect(() => {
@@ -77,7 +81,7 @@ export function InsertRowModal({
   }
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={next => { if (!saving) onOpenChange(next) }}>
       <DialogPrimitive.Portal>
         {/* Dimmed backdrop overlay */}
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
@@ -100,14 +104,14 @@ export function InsertRowModal({
                 </span>
               </DialogPrimitive.Title>
             </div>
-            <DialogPrimitive.Close className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-gray-100 dark:hover:bg-surface-200 transition-colors cursor-pointer">
+            <DialogPrimitive.Close disabled={saving} className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-gray-100 dark:hover:bg-surface-200 transition-colors cursor-pointer">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           </div>
 
           {/* Scrollable Form Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-gray-200 dark:divide-default">
+          <fieldset disabled={saving} className="min-w-0 flex-1 overflow-y-auto px-6 py-5 divide-y divide-gray-200 dark:divide-default">
             {selectedTable.columns.map((c, index) => {
               const isFieldNull = !!nullFields[c.name]
               const val = newRowData[c.name] ?? ''
@@ -250,7 +254,7 @@ export function InsertRowModal({
                 </div>
               )
             })}
-          </div>
+          </fieldset>
 
           {/* Sticky Bottom Action Toolbar */}
           <div className="sticky bottom-0 bg-white dark:bg-surface-100 border-t border-gray-200 dark:border-default px-6 py-4 flex items-center justify-between shrink-0">
@@ -260,6 +264,7 @@ export function InsertRowModal({
                 type="button"
                 role="switch"
                 aria-checked={createMore}
+                disabled={saving}
                 onClick={() => setCreateMore(!createMore)}
                 className={cn(
                   'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
@@ -280,6 +285,7 @@ export function InsertRowModal({
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                disabled={saving}
                 onClick={() => onOpenChange(false)}
                 className="px-3.5 py-1.5 rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-100 hover:bg-gray-100 dark:hover:bg-surface-200 text-foreground text-xs font-medium transition-colors cursor-pointer"
               >
@@ -288,10 +294,13 @@ export function InsertRowModal({
               <button
                 type="button"
                 onClick={handleSave}
+                disabled={saving}
+                aria-busy={saving}
                 className="px-4 py-1.5 rounded-md bg-[#086E43] hover:bg-[#065836] border border-[#338161] text-white text-xs font-medium shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <span>Save</span>
-                <span className="text-[10px] opacity-75 font-mono">Ctrl ↵</span>
+                {saving && <Spinner size={14} decorative />}
+                <span>{saving ? 'Saving…' : 'Save'}</span>
+                {!saving && <span className="text-[10px] opacity-75 font-mono">Ctrl ↵</span>}
               </button>
             </div>
           </div>

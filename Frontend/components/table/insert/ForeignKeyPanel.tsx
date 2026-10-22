@@ -18,6 +18,9 @@ interface ForeignKeyPanelProps {
   sourceType: string
   initialDraft: ForeignKeyDraft | null
   onSave: (draft: ForeignKeyDraft) => void
+  sourceColumns?: { id: string; name: string; type: string }[]
+  sourceColumnId?: string
+  onSourceColumnChange?: (id: string) => void
 }
 
 const tableKey = (table: Pick<SchemaNode, 'schema' | 'name'>) => JSON.stringify([table.schema, table.name])
@@ -30,6 +33,9 @@ export function ForeignKeyPanel({
   sourceType,
   initialDraft,
   onSave,
+  sourceColumns,
+  sourceColumnId,
+  onSourceColumnChange,
 }: ForeignKeyPanelProps) {
   const { database } = useStudio()
   const [tables, setTables] = useState<SchemaNode[]>([])
@@ -47,6 +53,9 @@ export function ForeignKeyPanel({
     () => tables.find((table) => tableKey(table) === targetTableKey),
     [tables, targetTableKey]
   )
+  const selectedSource = sourceColumns?.find((column) => column.id === sourceColumnId)
+  const effectiveSourceColumn = selectedSource?.name ?? sourceColumn
+  const effectiveSourceType = selectedSource?.type ?? sourceType
 
   useEffect(() => {
     const databaseChanged = previousDatabase.current !== database
@@ -98,7 +107,7 @@ export function ForeignKeyPanel({
     return () => controller.abort()
   }, [open, database, retryCount])
 
-  const canSave = !!targetTable && targetTable.columns.some(column => column.name === targetColumn) && !!sourceColumn.trim()
+  const canSave = !!targetTable && targetTable.columns.some(column => column.name === targetColumn) && !!effectiveSourceColumn.trim() && (!sourceColumns || !!selectedSource)
 
   useEffect(() => {
     if (!open) return
@@ -148,7 +157,7 @@ export function ForeignKeyPanel({
                 Add foreign key relationship to <span className="font-mono text-sm">{tableName}</span>
               </DialogPrimitive.Title>
               <DialogPrimitive.Description id="foreign-key-panel-description" className="sr-only">
-                Choose a table and column that this new column will reference.
+                Choose a local column and a table column to create a foreign key relationship.
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close
@@ -254,10 +263,23 @@ export function ForeignKeyPanel({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
                 <div>
                   <label className="mb-1.5 block text-[11px] font-medium text-foreground-lighter">This column</label>
-                  <div className="min-h-9 rounded-md border border-gray-300 dark:border-default bg-white dark:bg-surface-200 px-3 py-2 font-mono text-xs text-foreground">
-                    {sourceColumn.trim() ? sourceColumn : <span className="text-foreground-lighter">Name your column first</span>}
-                  </div>
-                  <p className="mt-1 text-[10px] text-foreground-lighter">{sourceType || 'No type selected'}</p>
+                  {sourceColumns && onSourceColumnChange ? (
+                    <Select value={sourceColumnId || ''} onValueChange={onSourceColumnChange}>
+                      <SelectTrigger aria-label="Select local source column" className="bg-white dark:bg-surface-200 border-gray-300 dark:border-strong hover:bg-white dark:hover:bg-surface-300/60 focus:border-gray-400 dark:focus:border-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0">
+                        <SelectValue placeholder="Choose a local column…" />
+                      </SelectTrigger>
+                      <SelectContent data-foreign-key-select>
+                        {sourceColumns.map((column) => (
+                          <SelectItem key={column.id} value={column.id} className="hover:bg-white focus:bg-gray-100 focus:text-foreground dark:hover:bg-surface-300 dark:focus:bg-surface-300">{column.name || 'Unnamed column'}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="min-h-9 rounded-md border border-gray-300 dark:border-default bg-white dark:bg-surface-200 px-3 py-2 font-mono text-xs text-foreground">
+                      {effectiveSourceColumn.trim() ? effectiveSourceColumn : <span className="text-foreground-lighter">Name your column first</span>}
+                    </div>
+                  )}
+                  <p className="mt-1 text-[10px] text-foreground-lighter">{effectiveSourceType || 'No type selected'}</p>
                 </div>
                 <span aria-hidden="true" className="hidden pb-5 text-foreground-lighter sm:block">→</span>
                 <div>

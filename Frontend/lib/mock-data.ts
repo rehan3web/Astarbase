@@ -1,3 +1,5 @@
+import type { ForeignKeyAction } from './foreign-keys'
+
 export interface ColumnDefinition {
   id: string
   name: string
@@ -11,6 +13,8 @@ export interface ColumnDefinition {
     targetTable: string
     targetColumn: string
     targetSchema?: string
+    onDelete?: ForeignKeyAction
+    onUpdate?: ForeignKeyAction
   }
   comment?: string
 }

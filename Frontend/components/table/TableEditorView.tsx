@@ -85,10 +85,10 @@ export function TableEditorView() {
       .catch(e => { if (!controller.signal.aborted) setError(errorMessage(e)) })
     return () => controller.abort()
   }, [loadTables])
-  const loadRows = useCallback(async (signal?: AbortSignal) => {
+  const loadRows = useCallback(async (signal?: AbortSignal, preserveData = false) => {
     if (!selected) return false
     const current = ++version.current
-    setLoading(true); setError(''); setData(null); setSelectedRows(new Set())
+    setLoading(true); setError(''); if (!preserveData) setData(null); setSelectedRows(new Set())
     try {
       const result = await api<TableRows>(`${tablePath(database, selected.schema, selected.name)}?limit=${limit}&offset=${offset}`, { signal })
       if (current === version.current && !signal?.aborted) { setData(result); return true }
@@ -166,10 +166,10 @@ export function TableEditorView() {
     if (kind === 'sql') content = selected.map(row => `INSERT INTO ${qi(data.schema)}.${qi(data.name)} (${data.columns.map(c => qi(c.name)).join(', ')}) VALUES (${data.columns.map(c => row[c.name] === null || row[c.name] === undefined ? 'NULL' : typeof row[c.name] === 'number' || typeof row[c.name] === 'boolean' ? String(row[c.name]) : literal(String(row[c.name]))).join(', ')});`).join('\n')
     try { await copyText(content); notify(`Copied ${selected.length} selected row${selected.length === 1 ? '' : 's'} as ${kind.toUpperCase()}.`) } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') }
   }
-  async function refresh(announce = false) {
+  async function refresh(announce = false, preserveData = false) {
     try {
       await loadTables()
-      const rowsLoaded = await loadRows()
+      const rowsLoaded = await loadRows(undefined, preserveData)
       if (!rowsLoaded) throw new Error('Table rows could not be refreshed')
       if (announce) notify('Tables refreshed')
     }
@@ -178,6 +178,13 @@ export function TableEditorView() {
       setError(message)
       if (announce) notify(message, 'error')
       else throw e
+    }
+  }
+  async function refreshAfterInsert() {
+    try { await refresh(false, true) }
+    catch (e) {
+      const message = `Changes saved, but the table could not be refreshed: ${errorMessage(e)}`
+      setError(message); notify(message, 'error')
     }
   }
   async function cell(rowIdx: number, column: string, value: unknown) {
@@ -274,8 +281,13 @@ export function TableEditorView() {
         </>}</> : loading ? <LoadingIndicator label="Loading tables" className="flex-1" size={26} /> : error ? <div role="alert" className="m-5 rounded border border-destructive/30 p-4 text-sm text-red-400">{error}<button onClick={() => void loadTables().catch(e => setError(errorMessage(e)))} className="ml-3 underline">Retry</button></div> : <div className="p-10 text-sm text-foreground-lighter">{tables.length ? 'Select a table from the explorer or open a new tab.' : 'No tables in this schema. Create a table or use the SQL editor.'}</div>}
     </section>
     <InsertTableModal open={insertTable} onOpenChange={setInsertTable} schemaName={schema} onInsertTable={async t => {
-      const ok = await mutate(async () => { await sql(`BEGIN; ${createTableSql(t)} COMMIT;`); await loadTables(); openTable(t); setOffset(0) }, 'Table created')
-      if (ok) setInsertTable(false)
+      const ok = await mutate(async () => { await sql(`BEGIN; ${createTableSql(t)} COMMIT;`) }, 'Table created')
+      if (ok) {
+        setInsertTable(false); openTable(t); setOffset(0)
+        try { await loadTables() }
+        catch (e) { notify(`Table created, but the table list could not be refreshed: ${errorMessage(e)}`, 'error') }
+      }
+      return ok
     }} />
     {table && <>
       <InsertRowModal open={insertRow} onOpenChange={setInsertRow} selectedTable={table} newRowData={rowValues} onNewRowDataChange={setRowValues} onInsert={async keepOpen => {
@@ -284,9 +296,10 @@ export function TableEditorView() {
             const col = data?.columns.find(c => c.name === key)
             return [key, col && ['json', 'jsonb'].includes(col.udt_name) && typeof value === 'string' ? JSON.parse(value) : value]
           }))
-          await api(tablePath(database, table.schema, table.name), { method: 'POST', body: { values } }); await loadRows()
+          await api(tablePath(database, table.schema, table.name), { method: 'POST', body: { values } })
         }, 'Row inserted')
-        if (ok) { setRowValues({}); if (!keepOpen) setInsertRow(false) }
+        if (ok) { setRowValues({}); if (!keepOpen) setInsertRow(false); await refreshAfterInsert() }
+        return ok
       }} />
       <InsertColumnModal open={insertColumn} onOpenChange={setInsertColumn} selectedTable={table} newColumnData={columnValues} onNewColumnDataChange={setColumnValues} mode={editingColumn ? 'edit' : 'create'} onInsert={async keepOpen => {
         const c = columnValues
@@ -295,7 +308,7 @@ export function TableEditorView() {
         if (editingColumn && !!c.isPrimaryKey !== !!data?.primaryKey.includes(editingColumn)) {
           setError('Use the SQL editor to change existing primary-key constraints. No changes were made.')
           notify('Changing an existing primary-key constraint is not supported here', 'error')
-          return
+          return false
         }
         let statement = `ALTER TABLE ${name} ADD COLUMN ${target} ${type}${c.isNullable ? '' : ' NOT NULL'}${c.defaultValue ? ` DEFAULT ${c.defaultValue}` : ''}${c.isPrimaryKey ? ' PRIMARY KEY' : ''};`
         if (editingColumn) {
@@ -304,8 +317,9 @@ export function TableEditorView() {
         }
         if (c.foreignKey) statement += `ALTER TABLE ${name} ADD FOREIGN KEY (${target}) ${foreignKeyReferenceSql(c.foreignKey)};`
         if (c.description !== undefined) statement += `COMMENT ON COLUMN ${name}.${target} IS ${literal(c.description)};`
-        const ok = await mutate(async () => { await sql(`BEGIN; ${statement} COMMIT;`); await refresh() }, editingColumn ? 'Column updated' : 'Column created')
-        if (ok) { setColumnValues(blankColumn); if (!keepOpen) setInsertColumn(false) }
+        const ok = await mutate(async () => { await sql(`BEGIN; ${statement} COMMIT;`) }, editingColumn ? 'Column updated' : 'Column created')
+        if (ok) { setColumnValues(blankColumn); if (!keepOpen) setInsertColumn(false); await refreshAfterInsert() }
+        return ok
       }} />
     </>}
     <DeleteTableModal open={!!deleteTable} onOpenChange={open => { if (!open) setDeleteTable(null) }} table={deleteTable} onConfirm={async (target, cascade) => {
