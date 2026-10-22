@@ -165,29 +165,29 @@ export function InsertTableModal({
         {/* Slide-over Right Panel */}
         <DialogPrimitive.Content
           className={cn(
-            'fixed inset-y-0 right-0 z-50 h-full w-full max-w-2xl bg-surface-100 border-l border-default shadow-2xl flex flex-col outline-none select-none',
+            'fixed inset-y-0 right-0 z-50 h-full w-full max-w-2xl bg-white dark:bg-surface-100 border-l border-gray-200 dark:border-default shadow-2xl flex flex-col outline-none select-none',
             'duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right'
           )}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-default shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-default shrink-0">
             <div className="flex items-center gap-2">
               <DialogPrimitive.Title className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <span>Create a new table</span>
-                <span className="font-mono text-xs px-2 py-0.5 rounded bg-surface-200 text-foreground-lighter border border-strong font-normal">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-white dark:bg-surface-200 text-foreground-lighter border border-gray-300 dark:border-strong font-normal">
                   schema: {schemaName}
                 </span>
               </DialogPrimitive.Title>
             </div>
-            <DialogPrimitive.Close className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-surface-200 transition-colors cursor-pointer">
+            <DialogPrimitive.Close className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-gray-100 dark:hover:bg-surface-200 transition-colors cursor-pointer">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           </div>
 
           {/* Scrollable Form Body matching InsertColumnModal layout */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-default">
+          <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-gray-200 dark:divide-default">
             {/* 1. General Section */}
             <div className="grid grid-cols-12 gap-4 py-5 items-start first:pt-0">
               <div className="col-span-4">
@@ -203,11 +203,11 @@ export function InsertTableModal({
                     value={tableName}
                     onChange={(e) => setTableName(e.target.value)}
                     placeholder="e.g. products"
-                    className="w-full h-8 px-3 rounded-md bg-surface-200 border border-strong text-foreground text-xs font-mono outline-none focus:border-brand"
+                    className="w-full h-8 px-3 rounded-md bg-white dark:bg-surface-200 border border-gray-300 dark:border-strong text-foreground text-xs font-mono outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
                   />
                   <p className="text-[11px] text-foreground-lighter mt-1 leading-relaxed">
                     Recommended to use lowercase and use an underscore to separate words e.g.{' '}
-                    <code className="text-foreground font-mono bg-surface-200 px-1 py-0.5 rounded text-[10px]">
+                    <code className="text-foreground font-mono bg-white dark:bg-surface-200 px-1 py-0.5 rounded text-[10px]">
                       table_name
                     </code>
                   </p>
@@ -222,7 +222,7 @@ export function InsertTableModal({
                     value={tableDescription}
                     onChange={(e) => setTableDescription(e.target.value)}
                     placeholder="Optional description"
-                    className="w-full h-8 px-3 rounded-md bg-surface-200 border border-strong text-foreground text-xs outline-none focus:border-brand"
+                    className="w-full h-8 px-3 rounded-md bg-white dark:bg-surface-200 border border-gray-300 dark:border-strong text-foreground text-xs outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
                   />
                 </div>
               </div>
@@ -313,7 +313,7 @@ export function InsertTableModal({
                   <button
                     type="button"
                     onClick={handleAddColumn}
-                    className="w-full px-2.5 py-1.5 text-xs rounded border border-strong bg-surface-200 hover:bg-surface-300 text-foreground transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-medium"
+                    className="w-full px-2.5 py-1.5 text-xs rounded border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 hover:bg-gray-100 dark:hover:bg-surface-300 text-foreground transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-medium"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>Add column</span>
@@ -325,9 +325,9 @@ export function InsertTableModal({
                 {columns.map((col, idx) => (
                   <div
                     key={col.id}
-                    className="p-3 rounded-md border border-default bg-surface-200/50 space-y-3"
+                    className="p-3 rounded-md border border-gray-200 dark:border-default bg-white dark:bg-surface-200/50 space-y-3"
                   >
-                    <div className="flex items-center justify-between border-b border-default pb-2">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-default pb-2">
                       <span className="text-xs font-medium text-foreground flex items-center gap-1.5 font-mono">
                         {col.isPrimaryKey && <PrimaryKeyIcon className="h-3 w-3 text-amber-400" />}
                         <span>{col.name || `Column ${idx + 1}`}</span>
@@ -355,7 +355,7 @@ export function InsertTableModal({
                             handleUpdateColumn(col.id, { name: e.target.value })
                           }
                           placeholder="Column name"
-                          className="w-full h-8 px-2.5 text-xs bg-surface-100 border border-strong rounded text-foreground font-mono placeholder:text-foreground-lighter focus:outline-none focus:border-brand"
+                          className="w-full h-8 px-2.5 text-xs bg-white dark:bg-surface-100 border border-gray-300 dark:border-strong rounded text-foreground font-mono placeholder:text-foreground-lighter focus:outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
                         />
                       </div>
 
@@ -370,7 +370,7 @@ export function InsertTableModal({
                             handleUpdateColumn(col.id, { type: val })
                           }
                         >
-                          <SelectTrigger className="w-full h-8 text-xs font-mono bg-surface-100 border border-strong">
+                          <SelectTrigger className="w-full h-8 text-xs font-mono bg-white dark:bg-surface-100 border border-gray-300 dark:border-strong hover:bg-white dark:hover:bg-surface-300/60 focus:border-gray-400 dark:focus:border-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0">
                             <SelectValue placeholder="Select type..." />
                           </SelectTrigger>
                           <SelectContent className="max-h-56">
@@ -404,7 +404,7 @@ export function InsertTableModal({
                           handleUpdateColumn(col.id, { defaultValue: e.target.value })
                         }
                         placeholder="NULL or expression e.g. now()"
-                        className="w-full h-8 px-2.5 text-xs bg-surface-100 border border-strong rounded text-foreground font-mono placeholder:text-foreground-lighter focus:outline-none focus:border-brand"
+                        className="w-full h-8 px-2.5 text-xs bg-white dark:bg-surface-100 border border-gray-300 dark:border-strong rounded text-foreground font-mono placeholder:text-foreground-lighter focus:outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
                       />
                     </div>
 
@@ -464,11 +464,11 @@ export function InsertTableModal({
           </div>
 
           {/* Sticky Bottom Action Toolbar - Matching InsertRowModal / InsertColumnModal */}
-          <div className="sticky bottom-0 bg-surface-100 border-t border-default px-6 py-4 flex items-center justify-end gap-2 shrink-0">
+          <div className="sticky bottom-0 bg-white dark:bg-surface-100 border-t border-gray-200 dark:border-default px-6 py-4 flex items-center justify-end gap-2 shrink-0">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="px-3.5 py-1.5 rounded-md border border-strong bg-surface-100 hover:bg-surface-200 text-foreground text-xs font-medium transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-100 hover:bg-gray-100 dark:hover:bg-surface-200 text-foreground text-xs font-medium transition-colors cursor-pointer"
             >
               Cancel
             </button>

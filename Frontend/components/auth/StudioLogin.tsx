@@ -6,7 +6,6 @@ import { SorabaseLogo } from '@/components/ui/SorabaseLogo'
 type StudioLoginProps = {
   identifier: string
   password: string
-  error: string
   busy: boolean
   configured: boolean
   onIdentifierChange: (value: string) => void
@@ -17,7 +16,6 @@ type StudioLoginProps = {
 export function StudioLogin({
   identifier,
   password,
-  error,
   busy,
   configured,
   onIdentifierChange,
@@ -130,7 +128,7 @@ export function StudioLogin({
           outline-offset: 2px;
         }
         .sora-auth__reveal svg { width: 16px; height: 16px; }
-        .sora-auth__setup, .sora-auth__error {
+        .sora-auth__setup {
           margin: 0;
           border-radius: 6px;
           padding: 10px 12px;
@@ -138,7 +136,6 @@ export function StudioLogin({
           line-height: 1.5;
         }
         .sora-auth__setup { color: #765b20; background: #fbf5e7; border: 1px solid #eee1bf; }
-        .sora-auth__error { color: #9c3535; background: #fff0ef; border: 1px solid #f1d4d1; }
         .sora-auth__submit {
           width: 100%;
           height: 43px;
@@ -254,7 +251,6 @@ export function StudioLogin({
               </span>
             </label>
             {!configured && <p role="alert" className="sora-auth__setup">Admin login needs server-side setup.</p>}
-            {error && <p role="alert" className="sora-auth__error">{error}</p>}
             <button className="sora-auth__submit" type="submit" disabled={busy || !configured}>
               {busy ? 'Signing in…' : 'Login'}
             </button>

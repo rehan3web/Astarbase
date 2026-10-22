@@ -25,6 +25,7 @@ import { NEW_TAB_ID } from './tabs/TableTabBar'
 import { LoadingIndicator, Spinner } from '@/components/ui/spinner'
 import type { RecentTableItem } from './tabs/TableNewTabView'
 import { foreignKeyReferenceSql, type ForeignKeyDraft } from '@/lib/foreign-keys'
+import { copyText } from '@/lib/copy-text'
 
 type Summary = { schema: string; name: string; estimated_rows: string; rls_enabled?: boolean }
 type ColumnValues = { name: string; type: string; defaultValue: string; isNullable: boolean; isArray?: boolean; isPrimaryKey?: boolean; description?: string; foreignKey?: ForeignKeyDraft | null }
@@ -163,7 +164,7 @@ export function TableEditorView() {
     const selected = pickedRows
     let content = kind === 'csv' ? csv(selected) : JSON.stringify(selected, null, 2)
     if (kind === 'sql') content = selected.map(row => `INSERT INTO ${qi(data.schema)}.${qi(data.name)} (${data.columns.map(c => qi(c.name)).join(', ')}) VALUES (${data.columns.map(c => row[c.name] === null || row[c.name] === undefined ? 'NULL' : typeof row[c.name] === 'number' || typeof row[c.name] === 'boolean' ? String(row[c.name]) : literal(String(row[c.name]))).join(', ')});`).join('\n')
-    try { await navigator.clipboard.writeText(content); notify(`Copied ${selected.length} selected row${selected.length === 1 ? '' : 's'} as ${kind.toUpperCase()}.`) } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') }
+    try { await copyText(content); notify(`Copied ${selected.length} selected row${selected.length === 1 ? '' : 's'} as ${kind.toUpperCase()}.`) } catch (e) { const message = errorMessage(e); setError(message); notify(message, 'error') }
   }
   async function refresh(announce = false) {
     try {

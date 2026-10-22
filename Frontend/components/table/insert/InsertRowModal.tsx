@@ -85,29 +85,29 @@ export function InsertRowModal({
         {/* Slide-over Right Panel */}
         <DialogPrimitive.Content
           className={cn(
-            'fixed inset-y-0 right-0 z-50 h-full w-full max-w-2xl bg-surface-100 border-l border-default shadow-2xl flex flex-col outline-none select-none',
+            'fixed inset-y-0 right-0 z-50 h-full w-full max-w-2xl bg-white dark:bg-surface-100 border-l border-gray-200 dark:border-default shadow-2xl flex flex-col outline-none select-none',
             'duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right'
           )}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-default shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-default shrink-0">
             <div className="flex items-center gap-2">
               <DialogPrimitive.Title className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <span>Insert row into</span>
-                <span className="font-mono text-xs px-2 py-0.5 rounded bg-surface-200 text-foreground border border-strong font-normal">
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-white dark:bg-surface-200 text-foreground border border-gray-300 dark:border-strong font-normal">
                   {selectedTable.name}
                 </span>
               </DialogPrimitive.Title>
             </div>
-            <DialogPrimitive.Close className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-surface-200 transition-colors cursor-pointer">
+            <DialogPrimitive.Close className="p-1 rounded-md text-foreground-lighter hover:text-foreground hover:bg-gray-100 dark:hover:bg-surface-200 transition-colors cursor-pointer">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           </div>
 
           {/* Scrollable Form Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-default">
+          <div className="flex-1 overflow-y-auto px-6 py-5 divide-y divide-gray-200 dark:divide-default">
             {selectedTable.columns.map((c, index) => {
               const isFieldNull = !!nullFields[c.name]
               const val = newRowData[c.name] ?? ''
@@ -134,7 +134,7 @@ export function InsertRowModal({
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-200 text-foreground-lighter border border-strong">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white dark:bg-surface-200 text-foreground-lighter border border-gray-300 dark:border-strong">
                         {c.dataType}
                       </span>
                       {c.isPrimaryKey && (
@@ -165,7 +165,7 @@ export function InsertRowModal({
                           })
                         }
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full bg-white dark:bg-surface-200 border-gray-300 dark:border-strong hover:bg-white dark:hover:bg-surface-300/60 focus:border-gray-400 dark:focus:border-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0">
                           <SelectValue placeholder="Choose boolean..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -211,7 +211,7 @@ export function InsertRowModal({
                         onChange={(e) =>
                           onNewRowDataChange({ ...newRowData, [c.name]: e.target.value })
                         }
-                        className="w-full px-3 py-2 rounded-md bg-surface-200 border border-strong text-foreground text-xs font-mono outline-none focus:border-brand disabled:opacity-50 resize-y"
+                        className="w-full px-3 py-2 rounded-md bg-white dark:bg-surface-200 border border-gray-300 dark:border-strong text-foreground text-xs font-mono outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0 disabled:opacity-50 resize-y"
                       />
                     ) : (
                       <input
@@ -228,7 +228,7 @@ export function InsertRowModal({
                         onChange={(e) =>
                           onNewRowDataChange({ ...newRowData, [c.name]: e.target.value })
                         }
-                        className="w-full h-8 px-3 rounded-md bg-surface-200 border border-strong text-foreground text-xs font-mono outline-none focus:border-brand disabled:opacity-50"
+                        className="w-full h-8 px-3 rounded-md bg-white dark:bg-surface-200 border border-gray-300 dark:border-strong text-foreground text-xs font-mono outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0 disabled:opacity-50"
                       />
                     )}
 
@@ -240,7 +240,7 @@ export function InsertRowModal({
                             type="checkbox"
                             checked={isFieldNull}
                             onChange={() => toggleNull(c.name)}
-                            className="rounded border-strong bg-surface-200 text-brand focus:ring-0 cursor-pointer h-3.5 w-3.5"
+                            className="rounded border-gray-300 dark:border-strong bg-white dark:bg-surface-200 text-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0 cursor-pointer h-3.5 w-3.5"
                           />
                           <span>Set to NULL</span>
                         </label>
@@ -253,7 +253,7 @@ export function InsertRowModal({
           </div>
 
           {/* Sticky Bottom Action Toolbar */}
-          <div className="sticky bottom-0 bg-surface-100 border-t border-default px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="sticky bottom-0 bg-white dark:bg-surface-100 border-t border-gray-200 dark:border-default px-6 py-4 flex items-center justify-between shrink-0">
             {/* Left: Create More Switch */}
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <button
@@ -281,7 +281,7 @@ export function InsertRowModal({
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="px-3.5 py-1.5 rounded-md border border-strong bg-surface-100 hover:bg-surface-200 text-foreground text-xs font-medium transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-100 hover:bg-gray-100 dark:hover:bg-surface-200 text-foreground text-xs font-medium transition-colors cursor-pointer"
               >
                 Cancel
               </button>

@@ -80,7 +80,6 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     <StudioLogin
       identifier={identifier}
       password={password}
-      error={error}
       busy={busy}
       configured={configured}
       onIdentifierChange={setIdentifier}

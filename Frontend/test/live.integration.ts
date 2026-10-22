@@ -22,6 +22,8 @@ import { verifyLoadingStates } from './loading-states.browser'
 import { verifyTableDefinition } from './table-definition.browser'
 import { verifyServiceStatus } from './service-status.browser'
 import { verifyTableSurfaces } from './table-surfaces.browser'
+import { verifyTableRowCopy } from './table-row-copy.browser'
+import { verifyInsertSurfaces } from './insert-surfaces.browser'
 import { verifyBranchActions } from './branch-actions.browser'
 import { verifySqlExports } from './sql-export.browser'
 import { verifySqlLibrary } from './sql-library.browser'
@@ -176,6 +178,9 @@ try {
   await page.getByLabel('Password', { exact: true }).fill('incorrect-password')
   await page.getByRole('button', { name: 'Login', exact: true }).click()
   await expectToast('Invalid username/email or password', true)
+  await expect(page.locator('.sora-auth__form-wrap').getByRole('alert')).toHaveCount(0)
+  await expect(page.locator('.sora-auth__error')).toHaveCount(0)
+  await snapshot('login-error-toast-only')
   await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeVisible()
   await page.getByLabel('Password', { exact: true }).fill(loginPassword)
   await page.getByRole('button', { name: 'Login', exact: true }).click()
@@ -195,9 +200,10 @@ try {
     console.log('PASS: split login layout, social links only, password visibility, invalid credentials, username/email login, logout and HttpOnly session')
     return
   }
-  if (process.env.STUDIO_QUERY_ACTIVITY_ONLY === '1') {
+  if (process.env.STUDIO_QUERY_ACTIVITY_ONLY === '1' || process.env.STUDIO_UI_CLEANUP_ONLY === '1') {
     await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
     await verifyQueryActivityUi(page, url, config.DB_NAME, snapshot)
+    if (process.env.STUDIO_UI_CLEANUP_ONLY === '1') await verifyTableRowCopy(page, url, config.DB_NAME, snapshot)
     assert.deepEqual(browserErrors, [])
     return
   }
@@ -224,6 +230,18 @@ try {
   if (process.env.STUDIO_BRANCH_ACTIONS_ONLY === '1') {
     await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
     await verifyBranchActions(page, url, services, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+  if (process.env.STUDIO_INSERT_SURFACES_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifyInsertSurfaces(page, url, config.DB_NAME, snapshot)
+    assert.deepEqual(browserErrors, [])
+    return
+  }
+  if (process.env.STUDIO_TABLE_ROW_COPY_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifyTableRowCopy(page, url, config.DB_NAME, snapshot)
     assert.deepEqual(browserErrors, [])
     return
   }

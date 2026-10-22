@@ -90,7 +90,7 @@ export function TableToolbar({
                 <Button
                   variant="default"
                   size="small"
-                  className="text-xs h-[28px] px-2.5 gap-1 bg-surface-100 hover:bg-surface-200 border-default font-medium text-foreground cursor-pointer"
+                  className="text-xs h-[28px] px-2.5 gap-1 bg-white hover:bg-white dark:bg-surface-100 dark:hover:bg-surface-200 border-default font-medium text-foreground cursor-pointer"
                 >
                   <span>Copy</span>
                   <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
@@ -109,7 +109,7 @@ export function TableToolbar({
                 <Button
                   variant="default"
                   size="small"
-                  className="text-xs h-[28px] px-2.5 gap-1 bg-surface-100 hover:bg-surface-200 border-default font-medium text-foreground cursor-pointer"
+                  className="text-xs h-[28px] px-2.5 gap-1 bg-white hover:bg-white dark:bg-surface-100 dark:hover:bg-surface-200 border-default font-medium text-foreground cursor-pointer"
                 >
                   <span>Export</span>
                   <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
