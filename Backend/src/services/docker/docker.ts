@@ -37,13 +37,13 @@ export class DockerService {
     } finally { stream.destroy(); }
   }
 
-  async exec(command: string[], timeoutMs = 300000, maxBytes = 8 * 1024 * 1024): Promise<{ stdout: string; stderr: string }> {
+  async exec(command: string[], timeoutMs = 300000, maxBytes = 8 * 1024 * 1024, applicationName = 'sorabase-admin'): Promise<{ stdout: string; stderr: string }> {
     const container = this.docker.getContainer(this.config.POSTGRES_CONTAINER);
     const exec = await container.exec({
       Cmd: command,
       User: 'postgres',
       Env: [`PGPASSWORD=${this.config.DB_PASSWORD}`, `PGHOST=${this.config.PG_SOCKET_DIR}`,
-        `PGUSER=${this.config.DB_USER}`, `PGOPTIONS=-c statement_timeout=${this.config.SQL_TIMEOUT_MS}`],
+        `PGUSER=${this.config.DB_USER}`, `PGAPPNAME=${applicationName}`, `PGOPTIONS=-c statement_timeout=${this.config.SQL_TIMEOUT_MS}`],
       AttachStdout: true,
       AttachStderr: true,
       Tty: false,

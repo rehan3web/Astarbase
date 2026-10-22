@@ -115,6 +115,16 @@ test('query and sync activity preserve operation results, persist only metadata,
   assert.equal(f.services.catalog.store.metrics.events(config.DB_NAME, 168, f.now()).length, 0);
 });
 
+test('database-log mode never records duplicate API query or branch-refresh events', async t => {
+  const f = fixture(t);
+  const metrics = new MetricsService({ ...config, POSTGRES_ACTIVITY_LOGS: 'true' }, f.services.catalog, f.services.postgres);
+  t.after(() => metrics.stop());
+  assert.equal(await metrics.track(config.DB_NAME, 'query', async () => 42), 42);
+  await metrics.track(config.DB_NAME, 'branch-refresh', async () => undefined);
+  await assert.rejects(metrics.track(config.DB_NAME, 'query', async () => { throw new Error('original SQL failure'); }), /original SQL failure/);
+  assert.deepEqual(f.services.catalog.store.metrics.events(config.DB_NAME, 1, Date.now()), []);
+});
+
 test('container CPU follows Docker deltas and Linux memory excludes inactive file cache', () => {
   assert.deepEqual(readCompute({
     cpu_stats: { cpu_usage: { total_usage: 300 }, system_cpu_usage: 1200, online_cpus: 4 },

@@ -36,6 +36,7 @@ const schema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(8000),
   AUTO_START_COMPOSE: z.enum(['true', 'false']).default('true'),
   SQL_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(30000),
+  POSTGRES_ACTIVITY_LOGS: z.enum(['true', 'false']).default('false'),
 });
 
 export type Config = z.infer<typeof schema>;

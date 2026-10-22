@@ -17,6 +17,40 @@ services:
       - unix_socket_directories=/var/run/postgresql
       - -c
       - unix_socket_permissions=0777
+      # Duration-only JSON logs: never log successful SQL text or bind values.
+      - -c
+      - logging_collector=on
+      - -c
+      - log_destination=jsonlog
+      - -c
+      - log_directory=/var/log/sorabase-activity
+      - -c
+      - log_filename=activity-%Y%m%d-%H%M%S.log
+      - -c
+      - log_rotation_age=1min
+      - -c
+      - log_rotation_size=4MB
+      - -c
+      - log_file_mode=0600
+      - -c
+      - log_duration=on
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_duration_statement=-1
+      - -c
+      - log_min_duration_sample=-1
+      - -c
+      - log_min_error_statement=panic
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_parameter_max_length=0
+      - -c
+      - log_parameter_max_length_on_error=0
+    tmpfs:
+      # Transient operational logs only; no raw error text in persistent volumes.
+      - /var/log/sorabase-activity:size=67108864,mode=0700
     ports:
       - "0.0.0.0:${POSTGRES_PUBLIC_PORT:-5432}:5432"
     volumes:
@@ -79,6 +113,7 @@ services:
       PG_SOCKET_DIR: /var/run/postgresql
       POSTGRES_CONTAINER: ${POSTGRES_CONTAINER:-sorabase-postgres}
       SQL_TIMEOUT_MS: ${SQL_TIMEOUT_MS:-30000}
+      POSTGRES_ACTIVITY_LOGS: "true"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - postgres-socket:/var/run/postgresql

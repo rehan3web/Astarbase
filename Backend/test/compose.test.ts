@@ -40,6 +40,12 @@ test('Compose alone loads root .env and wires all four services in dependency or
     assert.equal(services.frontend.depends_on.studio.condition, 'service_healthy');
     assert.equal(services.studio.depends_on.postgres.condition, 'service_healthy');
     assert.equal(services.studio.depends_on.pgbouncer.condition, 'service_healthy');
+    assert.equal(services.studio.environment.POSTGRES_ACTIVITY_LOGS, 'true');
+    assert.ok(services.postgres.command.includes('logging_collector=on'));
+    assert.ok(services.postgres.command.includes('log_duration=on'));
+    assert.ok(services.postgres.command.includes('log_min_duration_statement=-1'));
+    assert.ok(services.postgres.command.includes('log_parameter_max_length_on_error=0'));
+    assert.ok(services.postgres.tmpfs.some((mount: string) => mount.startsWith('/var/log/sorabase-activity:size=67108864')));
     assert.equal(services.frontend.environment.ADMIN_SOCKET_PATH, '/var/run/sorabase/admin.sock');
     assert.ok(services.frontend.volumes.some((v: { target: string }) => v.target === '/var/run/sorabase'));
     assert.ok(services.studio.volumes.some((v: { target: string }) => v.target === '/var/run/sorabase'));

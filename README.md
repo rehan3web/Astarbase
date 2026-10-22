@@ -278,9 +278,29 @@ Sign in with your **admin username or email and password**. There is no default 
 - CPU usage can exceed 100% because 100% represents one CPU core.
 - The backend samples managed databases every 30 seconds and retains telemetry for seven days.
 - Activity charts use recorded events and observed row-counter changes, not generated sample data.
+- Docker installs collect **Runs from PostgreSQL itself**, including Studio SQL, direct clients and PgBouncer clients, scoped to each managed database. Monitoring/admin maintenance connections are excluded. PostgreSQL is the single event source, so Studio API requests are not counted a second time.
+- Successful execution durations are logged without SQL text. Prepared-protocol Parse/Bind timings are excluded; the Execute is counted once. A simple-protocol SQL batch counts as one run, while pooler-generated SQL such as `SET application_name` is a real server execution and is included. Slow means duration ≥ 1,000 ms. Failed means a database `ERROR`, not an authentication/disconnection failure.
+- Query log metadata is collected on dashboard reads (at most every five seconds) and the regular 30-second sampler. Coverage starts after enabling monitoring; old external queries cannot be reconstructed. Existing Studio history is retained.
 - RLS status is Active when at least one user table in the selected database has RLS enabled. It is not proof that every table is protected.
 
 Unavailable readings are reported as unavailable rather than replaced with fabricated values.
+
+### Database-wide activity logging
+
+Compose enables duration-only JSON logging and a 64 MiB private **tmpfs** at `/var/log/sorabase-activity`. The collector reads it over the existing PostgreSQL Unix socket and removes fully consumed rotated files. SQLite keeps only database, timestamp, success/failure, duration and a non-reversible deduplication ID, plus file-offset checkpoints. It never stores raw SQL, error messages, bind values, client addresses, application names or query results.
+
+Successful SQL text and bind-parameter logging are disabled. PostgreSQL error records can still contain sensitive text supplied by an application or function; these operational records exist in the private transient log buffer, not database/admin data volumes, and are discarded after rotation/collection or container recreation. Protect host access and swap as part of server security.
+
+If collection fails, falls behind, or detects missing/malformed records, Sync Activity shows an explicit warning instead of claiming complete counts. Logging adds overhead; very high query rates can exhaust the bounded buffer and lose activity during outages. This is operational monitoring, not a lossless security audit trail.
+
+For existing installs, keep your `.env` and all volumes, then apply **the full stack update**, not a frontend-only rebuild:
+
+```bash
+git pull --ff-only origin main
+docker compose up -d --build --wait --wait-timeout 600
+```
+
+The PostgreSQL logging change requires a brief database restart and can disconnect clients. It does not reset database data or credentials. Compose enables `POSTGRES_ACTIVITY_LOGS=true` for the API; bare development/test servers leave it off until the corresponding database logging is configured.
 
 ## Backups and maintenance
 

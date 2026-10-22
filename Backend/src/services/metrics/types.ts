@@ -17,3 +17,6 @@ export type ActivityEvent = {
   id: number; database: string; kind: ActivityKind; status: 'success' | 'error';
   durationMs: number; occurredAt: string;
 };
+export type QueryLogEvent = {
+  database: string; status: 'success' | 'error'; durationMs: number; occurredAt: number;
+};

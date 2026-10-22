@@ -4,6 +4,8 @@ import type { PostgresContainer } from '../docker/postgres.js';
 import { METRICS_RETENTION_DAYS } from '../../db/metrics-store.js';
 import { activityRates, readCompute, readDatabase } from './readings.js';
 import type { ActivityKind, ComputeReading, DatabaseReading, MetricSample } from './types.js';
+import { PostgresLogSource } from './postgres-log-source.js';
+import { QueryLogCollector } from './query-log-collector.js';
 
 export const METRICS_INTERVAL_MS = 30000;
 type Sources = { database: (database: string) => Promise<DatabaseReading>; compute: () => Promise<ComputeReading>; now: () => number };
@@ -23,12 +25,19 @@ export class MetricsService {
   private errors = new Map<string, string[]>();
   private computeCache?: { expires: number; promise: Promise<ComputeReading> };
   private persistenceError = false;
+  private queryLogs?: QueryLogCollector;
   constructor(config: Config, private catalog: Catalog, postgres: PostgresContainer, sources?: Partial<Sources>) {
     this.sources = {
       database: database => readDatabase(config, database),
       compute: async () => readCompute(await postgres.docker.stats()),
       now: () => Date.now(), ...sources,
     };
+    if (config.POSTGRES_ACTIVITY_LOGS === 'true') {
+      this.queryLogs = new QueryLogCollector(
+        new PostgresLogSource(config, async file => { await postgres.docker.exec(['rm', '-f', '--', file], 5000); }),
+        catalog.store.metrics, config.DB_USER,
+        () => new Set(catalog.store.branches().map(branch => branch.database_name)), this.sources.now);
+    }
   }
   private compute() {
     const now = this.sources.now();
@@ -68,6 +77,7 @@ export class MetricsService {
   }
   async read(database: string, hours: number, limit: number) {
     await this.catalog.assertDatabase(database);
+    await this.queryLogs?.poll();
     this.catalog.store.metrics.prune(this.sources.now());
     const previous = this.catalog.store.metrics.latest(database);
     if (!previous || this.sources.now() - Date.parse(previous.sampledAt) >= METRICS_INTERVAL_MS) {
@@ -79,7 +89,8 @@ export class MetricsService {
     return {
       database, latest, history: this.catalog.store.metrics.history(database, hours, limit, now),
       events: this.catalog.store.metrics.events(database, hours, now),
-      activity: this.catalog.store.metrics.activity(database, hours, now),
+      activity: { ...this.catalog.store.metrics.activity(database, hours, now),
+        ...(this.queryLogs ? { monitoring: this.queryLogs.status() } : {}) },
       stale: !latest || errors.length === 2 || now - Date.parse(latest.sampledAt) > 90000,
       errors: [...errors, ...(this.persistenceError ? ['Activity history could not be persisted'] : [])],
       intervalSeconds: METRICS_INTERVAL_MS / 1000, retentionDays: METRICS_RETENTION_DAYS,
@@ -87,6 +98,9 @@ export class MetricsService {
     };
   }
   async track<T>(database: string, kind: ActivityKind, work: () => Promise<T>): Promise<T> {
+    // In log mode PostgreSQL is the single source of query runs. Never count
+    // API requests again, and do not mix branch-refresh jobs with SQL executions.
+    if (this.queryLogs) return work();
     const started = performance.now();
     const record = (status: 'success' | 'error') => {
       if (this.stopped) return;
@@ -111,6 +125,7 @@ export class MetricsService {
     if (this.ticking || this.stopped) return;
     this.ticking = true;
     try {
+      await this.queryLogs?.poll();
       this.catalog.store.metrics.prune(this.sources.now());
       for (const branch of this.catalog.store.branches()) {
         if (this.stopped) break;
@@ -120,5 +135,5 @@ export class MetricsService {
       console.error('[metrics] Sampling failed; inspect the local Unix sockets and SQLite storage');
     } finally { this.ticking = false; }
   }
-  stop() { this.stopped = true; if (this.timer) clearInterval(this.timer); }
+  stop() { this.stopped = true; this.queryLogs?.stop(); if (this.timer) clearInterval(this.timer); }
 }

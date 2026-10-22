@@ -26,6 +26,7 @@ import { verifyBranchActions } from './branch-actions.browser'
 import { verifySqlExports } from './sql-export.browser'
 import { verifySqlLibrary } from './sql-library.browser'
 import { verifyDashboardMetrics } from './dashboard-metrics.browser'
+import { verifyQueryActivityUi } from './query-activity.browser'
 import { verifyStorageAndBackups } from './backups.browser'
 import { verifyBackupSurfaces } from './backup-surfaces.browser'
 import { pipeline } from 'node:stream/promises'
@@ -192,6 +193,12 @@ try {
     assert.equal((await page.request.get(`${url}/api/studio/branches`)).status(), 200)
     assert.deepEqual(browserErrors, [])
     console.log('PASS: split login layout, social links only, password visibility, invalid credentials, username/email login, logout and HttpOnly session')
+    return
+  }
+  if (process.env.STUDIO_QUERY_ACTIVITY_ONLY === '1') {
+    await expect(page.getByRole('heading', { name: 'Sorabase', exact: true })).toBeVisible({ timeout: 30000 })
+    await verifyQueryActivityUi(page, url, config.DB_NAME, snapshot)
+    assert.deepEqual(browserErrors, [])
     return
   }
   if (process.env.STUDIO_BACKUP_SURFACES_ONLY === '1') {

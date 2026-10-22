@@ -3,6 +3,9 @@ set -eu
 # Named volumes are initially owned by root. Prepare before the official
 # entrypoint drops privileges, on every boot (including existing PG volumes).
 mkdir -p /var/lib/sorabase/backups
+mkdir -p /var/log/sorabase-activity
+chown postgres:postgres /var/log/sorabase-activity
+chmod 700 /var/log/sorabase-activity
 for archive in /var/lib/sorabase/legacy-backups/*.dump; do
   [ -f "$archive" ] || continue
   target="/var/lib/sorabase/backups/$(basename "$archive")"

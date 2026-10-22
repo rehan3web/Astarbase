@@ -47,7 +47,7 @@ export class PostgresContainer {
       'psql', '-X', '--no-password', '--host', this.config.PG_SOCKET_DIR,
       '--username', this.config.DB_USER, '--dbname', database,
       '--set', 'ON_ERROR_STOP=1', '--csv', '--pset', 'footer=off', '--command', sql,
-    ], this.config.SQL_TIMEOUT_MS + 15000);
+    ], this.config.SQL_TIMEOUT_MS + 15000, undefined, 'sorabase-sql');
     return { ...output, format: 'csv', durationMs: Math.round(performance.now() - start) };
   }
 

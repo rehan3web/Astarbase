@@ -70,11 +70,15 @@ export function SyncActivityChart({ activity, loading = false }: { activity: Act
       <div className="flex flex-col justify-between gap-4 pb-4 sm:flex-row sm:items-start">
         <div>
           <h2 id="sync-activity-title" className="text-base font-semibold leading-tight tracking-tight text-foreground">Sync Activity</h2>
-          <p className="mt-1 text-xs text-foreground-lighter" aria-live="polite">
+          <p className="mt-1 text-xs text-foreground-lighter" aria-live="polite"
+            title={activity?.monitoring?.since ? `Database-wide monitoring since ${activity.monitoring.since}. Earlier Studio history is retained. SQL batches count as one run; pooler session commands are included.` : undefined}>
             {loading ? <span className="sr-only">Loading sync activity</span> : activity
-              ? `${formatCount(grandTotal)} recorded ${unit} in ${rangeLabel} · ${observed.length} of ${buckets.length} bins observed${metricMode === 'runs' ? ` · Slow ≥ ${formatCount(activity.slowThresholdMs)} ms` : ''}`
+              ? `${formatCount(grandTotal)} recorded ${unit} in ${rangeLabel} · ${observed.length} of ${buckets.length} bins observed${metricMode === 'runs' ? ` · Slow ≥ ${formatCount(activity.slowThresholdMs)} ms${activity.monitoring ? activity.monitoring.status === 'active' ? ' · All database clients' : ' · Database-wide monitoring' : ''}` : ''}`
               : `Persisted activity telemetry · ${rangeLabel}`}
           </p>
+          {metricMode === 'runs' && activity?.monitoring?.message && (
+            <p role="status" className="mt-1 text-xs text-amber-600 dark:text-amber-400">{activity.monitoring.message}</p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-4 self-start sm:gap-5">
           <div className="flex items-center gap-3 text-xs text-foreground-lighter" aria-label={metricMode === 'runs' ? 'Run status legend' : 'Row changes legend'}>

@@ -42,6 +42,13 @@ export type ActivityTelemetry = {
   endAt: string
   slowThresholdMs: number
   buckets: ActivityBucket[]
+  monitoring?: {
+    source: 'postgres-logs'
+    status: 'collecting' | 'active' | 'unavailable' | 'degraded'
+    since: string | null
+    lastCollectedAt: string | null
+    message: string | null
+  }
 }
 
 export type DashboardMetrics = {

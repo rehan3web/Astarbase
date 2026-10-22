@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { ActivityEvent, ActivityKind, MetricSample } from '../services/metrics/types.js';
+import type { ActivityEvent, ActivityKind, MetricSample, QueryLogEvent } from '../services/metrics/types.js';
 import { activityWindow, buildActivity, SLOW_OPERATION_MS, type ActivityRow, type RunBucket } from '../services/metrics/activity.js';
 
 export const METRICS_RETENTION_DAYS = 7;
@@ -20,7 +20,16 @@ export class MetricsStore {
       CREATE INDEX IF NOT EXISTS metric_events_database_time ON metric_events(database_name,occurred_at);
       CREATE INDEX IF NOT EXISTS metric_samples_time ON metric_samples(sampled_at);
       CREATE INDEX IF NOT EXISTS metric_events_time ON metric_events(occurred_at);
+      CREATE TABLE IF NOT EXISTS metric_log_cursors (
+        name TEXT PRIMARY KEY, offset INTEGER NOT NULL, discarding INTEGER NOT NULL DEFAULT 0,
+        observed_size INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS metric_log_metadata (key TEXT PRIMARY KEY,value TEXT NOT NULL);
     `);
+    if (!db.prepare('PRAGMA table_info(metric_events)').all().some(row => row.name === 'source_id')) {
+      db.exec('ALTER TABLE metric_events ADD COLUMN source_id TEXT');
+    }
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS metric_events_source_id ON metric_events(source_id) WHERE source_id IS NOT NULL');
     if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='metric_origins'").get()) {
       // One-time backfill preserves the first recording when upgrading an existing installation.
       db.exec(`
@@ -68,6 +77,33 @@ export class MetricsStore {
     this.db.prepare('INSERT INTO metric_events(database_name,occurred_at,kind,status,duration_ms) VALUES(?,?,?,?,?)')
       .run(database, now, kind, status, Math.max(0, Math.round(durationMs)));
     this.rememberStart(database, now);
+  }
+  logCursors() {
+    return this.db.prepare('SELECT name,offset,discarding,observed_size AS observedSize FROM metric_log_cursors')
+      .all() as { name: string; offset: number; discarding: number; observedSize: number }[];
+  }
+  logMetadata(key: string): string | null {
+    const row = this.db.prepare('SELECT value FROM metric_log_metadata WHERE key=?').get(key);
+    return row ? String(row.value) : null;
+  }
+  setLogMetadata(key: string, value: string) {
+    this.db.prepare('INSERT OR REPLACE INTO metric_log_metadata(key,value) VALUES(?,?)').run(key, value);
+  }
+  forgetLog(name: string) { this.db.prepare('DELETE FROM metric_log_cursors WHERE name=?').run(name); }
+  ingestLog(name: string, offset: number, discarding: boolean, observedSize: number,
+    events: (QueryLogEvent & { sourceId: string })[], now: number) {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const insert = this.db.prepare(`INSERT OR IGNORE INTO metric_events
+        (database_name,occurred_at,kind,status,duration_ms,source_id) VALUES(?,?,'query',?,?,?)`);
+      for (const event of events) {
+        insert.run(event.database, event.occurredAt, event.status, Math.max(0, event.durationMs), event.sourceId);
+        this.rememberStart(event.database, event.occurredAt);
+      }
+      this.db.prepare(`INSERT OR REPLACE INTO metric_log_cursors(name,offset,discarding,observed_size,updated_at)
+        VALUES(?,?,?,?,?)`).run(name, offset, Number(discarding), observedSize, now);
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   events(database: string, hours: number, now: number): ActivityEvent[] {
     return this.db.prepare(`
