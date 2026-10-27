@@ -830,12 +830,18 @@ try {
   await expect(page.getByRole('button', { name: 'Login', exact: true })).toBeVisible()
   assert.deepEqual(browserErrors, [])
   console.log('PASS: SQLite settings, sign-out, and no browser page errors')
+} catch (error) {
+  console.error('Integration failure before cleanup:', error)
+  throw error
 } finally {
   await browser?.close()
   if (next && next.exitCode === null) {
     const exit = new Promise(resolve => next!.once('exit', resolve))
     next.kill('SIGTERM')
+    const forceStop = setTimeout(() => { if (next?.exitCode === null) next.kill('SIGKILL') }, 10000)
+    forceStop.unref()
     await exit
+    clearTimeout(forceStop)
   }
   await listeners?.close()
   services?.close()

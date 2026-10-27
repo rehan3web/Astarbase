@@ -2,13 +2,16 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { GripVertical, Link2, Plus, Settings2, X } from 'lucide-react'
+import { GripVertical, Link2, Plus, Settings, X } from 'lucide-react'
 import { TableDefinition, ColumnDefinition } from '@/lib/mock-data'
 import type { ForeignKeyDraft } from '@/lib/foreign-keys'
+import { applyColumnTypeChange, getColumnTypeOptions } from '@/lib/column-type-options'
 import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useInsertSave } from './useInsertSave'
 import { ForeignKeyPanel } from './ForeignKeyPanel'
+import { ColumnDefaultValueInput } from './ColumnDefaultValueInput'
 import {
   Select,
   SelectContent,
@@ -31,14 +34,15 @@ interface TempColumn {
   type: string
   defaultValue: string
   isPrimaryKey: boolean
+  isUnique: boolean
   isNullable: boolean
   isArray: boolean
   foreignKey: ForeignKeyDraft | null
 }
 
 const makeInitialColumns = (): TempColumn[] => [
-  { id: 'column-id', name: 'id', type: 'int8', defaultValue: '', isPrimaryKey: true, isNullable: false, isArray: false, foreignKey: null },
-  { id: 'column-created-at', name: 'created_at', type: 'timestamptz', defaultValue: 'now()', isPrimaryKey: false, isNullable: false, isArray: false, foreignKey: null },
+  { id: 'column-id', name: 'id', type: 'int8', defaultValue: '', isPrimaryKey: true, isUnique: false, isNullable: false, isArray: false, foreignKey: null },
+  { id: 'column-created-at', name: 'created_at', type: 'timestamptz', defaultValue: 'now()', isPrimaryKey: false, isUnique: false, isNullable: false, isArray: false, foreignKey: null },
 ]
 
 const typeOptions = [
@@ -56,6 +60,7 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
   const [enableRls, setEnableRls] = useState(true)
   const [columns, setColumns] = useState<TempColumn[]>(makeInitialColumns)
   const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null)
+  const [defaultColumnId, setDefaultColumnId] = useState<string | null>(null)
   const [foreignKeyOpen, setForeignKeyOpen] = useState(false)
   const [foreignKeySourceId, setForeignKeySourceId] = useState<string | null>(null)
   const idSequence = useRef(0)
@@ -70,6 +75,7 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
     setEnableRls(true)
     setColumns(makeInitialColumns())
     setSettingsColumnId(null)
+    setDefaultColumnId(null)
     setForeignKeyOpen(false)
     setForeignKeySourceId(null)
   }, [open])
@@ -82,6 +88,7 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
       type: 'text',
       defaultValue: '',
       isPrimaryKey: false,
+      isUnique: false,
       isNullable: true,
       isArray: false,
       foreignKey: null,
@@ -91,6 +98,7 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
   const handleRemoveColumn = (id: string) => {
     setColumns((previous) => previous.length > 1 ? previous.filter((column) => column.id !== id) : previous)
     if (settingsColumnId === id) setSettingsColumnId(null)
+    if (defaultColumnId === id) setDefaultColumnId(null)
     if (foreignKeySourceId === id) {
       setForeignKeySourceId(null)
       setForeignKeyOpen(false)
@@ -98,7 +106,11 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
   }
 
   const updateColumn = (id: string, updates: Partial<TempColumn>) => {
-    setColumns((previous) => previous.map((column) => column.id === id ? { ...column, ...updates } : column))
+    setColumns((previous) => previous.map((column) => column.id === id
+      ? ('type' in updates || 'isArray' in updates
+        ? applyColumnTypeChange(column, updates)
+        : { ...column, ...updates })
+      : column))
   }
 
   const reorderColumn = (sourceId: string, targetId: string) => {
@@ -115,7 +127,7 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
   }
 
   const handleSave = useCallback(async () => {
-    if (settingsColumnId || foreignKeyOpen || saving || !tableName.trim()) return
+    if (settingsColumnId || defaultColumnId || foreignKeyOpen || saving || !tableName.trim()) return
     const tableCols: ColumnDefinition[] = columns.map((column) => {
       const submittedType = `${column.type}${column.isArray ? '[]' : ''}`
       return {
@@ -124,6 +136,7 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
         format: submittedType,
         dataType: submittedType,
         isPrimaryKey: column.isPrimaryKey,
+        isUnique: column.isUnique,
         isNullable: column.isNullable,
         defaultValue: column.defaultValue || null,
         description: '',
@@ -141,25 +154,26 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
       rows: [],
     }
     await save(() => onInsertTable(newTable))
-  }, [columns, enableRls, foreignKeyOpen, onInsertTable, save, saving, schemaName, settingsColumnId, tableDescription, tableName])
+  }, [columns, defaultColumnId, enableRls, foreignKeyOpen, onInsertTable, save, saving, schemaName, settingsColumnId, tableDescription, tableName])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        if (foreignKeyOpen || settingsColumnId || saving) return
+        if (foreignKeyOpen || settingsColumnId || defaultColumnId || saving) return
         event.preventDefault()
         void handleSave()
       }
     }
     if (open) window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [foreignKeyOpen, handleSave, open, saving, settingsColumnId])
+  }, [defaultColumnId, foreignKeyOpen, handleSave, open, saving, settingsColumnId])
 
   const activeForeignKeyColumn = columns.find((column) => column.id === foreignKeySourceId)
   const localSources = columns.map(({ id, name, type, isArray }) => ({ id, name, type: `${type}${isArray ? '[]' : ''}` }))
   const openForeignKeyEditor = (sourceId?: string) => {
     setForeignKeySourceId(sourceId ?? foreignKeySourceId ?? columns[0]?.id ?? null)
     setSettingsColumnId(null)
+    setDefaultColumnId(null)
     setForeignKeyOpen(true)
   }
 
@@ -278,35 +292,59 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
                           <SelectTrigger aria-label={`Type for ${column.name}`} className="h-10 w-full rounded-lg border-gray-300 dark:border-strong bg-white dark:bg-surface-200 font-mono text-xs hover:bg-white dark:hover:bg-surface-300/60 focus:bg-white dark:focus:bg-surface-200 focus:border-gray-400 dark:focus:border-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0"><SelectValue placeholder="Select type…" /></SelectTrigger>
                           <SelectContent className="max-h-56">{typeOptions.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
                         </Select>
-                        <input aria-label={`Default value for ${column.name}`} value={column.defaultValue} onChange={(event) => updateColumn(column.id, { defaultValue: event.target.value })} placeholder="NULL" className="h-10 w-full rounded-lg border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 px-3 font-mono text-xs outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200" />
+                        <ColumnDefaultValueInput
+                          label={`Default value for ${column.name}`}
+                          value={column.defaultValue}
+                          type={column.type}
+                          isArray={column.isArray}
+                          open={defaultColumnId === column.id}
+                          onOpenChange={(isOpen) => {
+                            if (isOpen) setSettingsColumnId(null)
+                            setDefaultColumnId(isOpen ? column.id : null)
+                          }}
+                          onChange={(value) => updateColumn(column.id, { defaultValue: value })}
+                          inputClassName="h-10"
+                        />
                         <div className="flex justify-center">
-                          <input type="checkbox" aria-label={`Primary key ${column.name}`} checked={column.isPrimaryKey} onChange={(event) => updateColumn(column.id, { isPrimaryKey: event.target.checked, isNullable: event.target.checked ? false : column.isNullable })} className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-[#086E43] focus:ring-gray-300" />
+                          <Checkbox aria-label={`Primary key ${column.name}`} checked={column.isPrimaryKey} disabled={!getColumnTypeOptions(column.type, column.isArray).supportsUnique} onCheckedChange={(checked) => updateColumn(column.id, { isPrimaryKey: checked, isNullable: checked ? false : column.isNullable, isUnique: checked ? false : column.isUnique })} className="h-[18px] w-[18px]" />
                         </div>
                         <div className="flex items-center justify-end gap-1">
-                          <Popover open={settingsColumnId === column.id} onOpenChange={(isOpen) => setSettingsColumnId(isOpen ? column.id : null)}>
+                          <Popover open={settingsColumnId === column.id} onOpenChange={(isOpen) => {
+                            if (isOpen) setDefaultColumnId(null)
+                            setSettingsColumnId(isOpen ? column.id : null)
+                          }}>
                             <PopoverTrigger asChild>
-                              <button type="button" aria-label={`Settings for ${column.name}`} aria-expanded={settingsColumnId === column.id} className={cn('rounded-md border p-2 transition-colors', settingsColumnId === column.id ? 'border-gray-400 bg-gray-100 dark:bg-surface-300' : 'border-transparent text-foreground-lighter hover:border-gray-300 hover:bg-white dark:hover:border-strong dark:hover:bg-surface-200')}>
-                              <Settings2 className="h-4 w-4" />
+                              <button type="button" aria-label={`Settings for ${column.name}`} aria-expanded={settingsColumnId === column.id} className={cn('relative rounded-md border p-2 transition-colors', settingsColumnId === column.id ? 'border-gray-400 bg-gray-100 dark:bg-surface-300' : 'border-transparent text-foreground-lighter hover:border-gray-300 hover:bg-white dark:hover:border-strong dark:hover:bg-surface-200')}>
+                              <Settings className="h-4 w-4" />
+                              {(column.isNullable || column.isUnique || column.isArray) && <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-black px-1 text-[9px] font-semibold leading-none text-white dark:border-surface-100 dark:bg-white dark:text-black">{Number(column.isNullable) + Number(column.isUnique) + Number(column.isArray)}</span>}
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent align="end" side="bottom" className="w-60 border-gray-200 bg-white p-3 text-foreground dark:border-default dark:bg-surface-100" onKeyDown={(event) => event.stopPropagation()}>
-                                <div className="mb-2 flex items-center justify-between">
-                                  <h3 className="text-xs font-semibold">Column settings</h3>
-                                  <button type="button" aria-label="Close column settings" onClick={() => setSettingsColumnId(null)} className="rounded p-1 text-foreground-lighter hover:bg-gray-100 dark:hover:bg-surface-200"><X className="h-3.5 w-3.5" /></button>
+                            <PopoverContent align="end" side="bottom" className="w-[min(30rem,calc(100vw-2rem))] overflow-hidden rounded-xl border-gray-200 bg-white p-0 text-foreground shadow-lg dark:border-default dark:bg-surface-100" onKeyDown={(event) => event.stopPropagation()}>
+                                <div className="relative flex h-12 items-center justify-center border-b border-gray-200 bg-gray-50/80 px-4 dark:border-default dark:bg-surface-200/70">
+                                  <h3 className="text-sm font-semibold">Extra options</h3>
+                                  <button type="button" aria-label="Close column settings" onClick={() => setSettingsColumnId(null)} className="absolute right-3 top-2.5 rounded p-1 text-foreground-lighter hover:bg-gray-100 dark:hover:bg-surface-200"><X className="h-3.5 w-3.5" /></button>
                                 </div>
-                                <label className="flex cursor-pointer items-start gap-2 border-t border-gray-200 dark:border-default py-2">
-                                  <input type="checkbox" checked={column.isNullable} disabled={column.isPrimaryKey} onChange={(event) => updateColumn(column.id, { isNullable: event.target.checked })} className="mt-0.5 h-4 w-4 accent-[#086E43]" />
-                                  <span><span className="block text-xs font-medium">Nullable</span><span className="text-[10px] text-foreground-lighter">Allow NULL values{column.isPrimaryKey ? ' · primary keys are not nullable' : ''}</span></span>
+                                <div className="space-y-1 px-4 py-3">
+                                <label className="flex cursor-pointer items-start gap-4 rounded-lg px-1 py-2.5">
+                                  <Checkbox aria-label={`Is nullable for ${column.name}`} checked={column.isNullable} disabled={column.isPrimaryKey} onCheckedChange={(checked) => updateColumn(column.id, { isNullable: checked })} className="mt-0.5 h-5 w-5 rounded-[6px] [&_svg]:h-3.5 [&_svg]:w-3.5" />
+                                  <span><span className="block text-base font-medium leading-6">Is nullable</span><span className="block text-sm leading-relaxed text-foreground-lighter">Specify if the column can assume a NULL value if no value is provided</span></span>
                                 </label>
-                                <label className="flex cursor-pointer items-start gap-2 border-t border-gray-200 dark:border-default py-2">
-                                  <input type="checkbox" checked={column.isArray} onChange={(event) => updateColumn(column.id, { isArray: event.target.checked })} className="mt-0.5 h-4 w-4 accent-[#086E43]" />
-                                  <span><span className="block text-xs font-medium">Array</span><span className="text-[10px] text-foreground-lighter">Submit as {column.type}[]</span></span>
+                                {getColumnTypeOptions(column.type, column.isArray).supportsUnique && !column.isPrimaryKey && (
+                                <label className="flex cursor-pointer items-start gap-4 rounded-lg px-1 py-2.5">
+                                  <Checkbox aria-label={`Is unique for ${column.name}`} checked={column.isUnique} onCheckedChange={(checked) => updateColumn(column.id, { isUnique: checked })} className="mt-0.5 h-5 w-5 rounded-[6px] [&_svg]:h-3.5 [&_svg]:w-3.5" />
+                                  <span><span className="block text-base font-medium leading-6">Is unique</span><span className="block text-sm leading-relaxed text-foreground-lighter">Enforce if values in the column should be unique across rows</span></span>
+                                </label>
+                                )}
+                                <label className="flex cursor-pointer items-start gap-4 rounded-lg px-1 py-2.5">
+                                  <Checkbox aria-label={`Define ${column.name} as array`} checked={column.isArray} onCheckedChange={(checked) => updateColumn(column.id, { isArray: checked })} className="mt-0.5 h-5 w-5 rounded-[6px] [&_svg]:h-3.5 [&_svg]:w-3.5" />
+                                  <span><span className="block text-base font-medium leading-6">Define as array</span><span className="block text-sm leading-relaxed text-foreground-lighter">Define your column as a variable-length multidimensional array</span></span>
                                 </label>
                                 {column.foreignKey && (
                                   <button type="button" onClick={() => updateColumn(column.id, { foreignKey: null })} className="flex w-full items-center gap-2 border-t border-gray-200 dark:border-default pt-2 text-left text-xs text-destructive hover:text-destructive/80">
                                     <X className="h-3.5 w-3.5" />Remove foreign key mapping
                                   </button>
                                 )}
+                                </div>
                             </PopoverContent>
                           </Popover>
                           <button type="button" aria-label={`Remove ${column.name}`} title="Remove column" onClick={() => handleRemoveColumn(column.id)} disabled={columns.length <= 1} className="rounded-md p-2 text-foreground-lighter transition-colors hover:bg-red-50 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-35 dark:hover:bg-destructive/10">
@@ -326,7 +364,7 @@ export function InsertTableModal({ open, onOpenChange, schemaName, onInsertTable
 
           <footer className="sticky bottom-0 flex shrink-0 items-center justify-end gap-2 border-t border-gray-200 dark:border-default bg-white dark:bg-surface-100 px-6 py-4">
             <button type="button" disabled={saving} onClick={() => onOpenChange(false)} className="rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-100 px-3.5 py-1.5 text-xs font-medium transition-colors hover:bg-gray-100 dark:hover:bg-surface-200 disabled:opacity-50">Cancel</button>
-            <button type="button" disabled={saving || !tableName.trim() || !!settingsColumnId || foreignKeyOpen} aria-busy={saving} onClick={() => void handleSave()} className="flex items-center gap-1.5 rounded-md border border-[#338161] bg-[#086E43] px-4 py-1.5 text-xs font-medium text-white shadow-xs transition-colors hover:bg-[#065836] disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" disabled={saving || !tableName.trim() || !!settingsColumnId || !!defaultColumnId || foreignKeyOpen} aria-busy={saving} onClick={() => void handleSave()} className="flex items-center gap-1.5 rounded-md border border-[#338161] bg-[#086E43] px-4 py-1.5 text-xs font-medium text-white shadow-xs transition-colors hover:bg-[#065836] disabled:cursor-not-allowed disabled:opacity-50">
               {saving && <Spinner size={14} decorative />}<span>{saving ? 'Saving…' : 'Save'}</span>{!saving && <span className="font-mono text-[10px] opacity-75">Ctrl ↵</span>}
             </button>
           </footer>

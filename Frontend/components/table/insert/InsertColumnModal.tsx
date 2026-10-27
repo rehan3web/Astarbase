@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { X, Check } from 'lucide-react'
+import { X } from 'lucide-react'
 import { TableDefinition } from '@/lib/mock-data'
+import { applyColumnTypeChange } from '@/lib/column-type-options'
 import { cn } from '@/lib/utils'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -16,6 +18,7 @@ import type { ForeignKeyDraft } from '@/lib/foreign-keys'
 import { ForeignKeyPanel } from './ForeignKeyPanel'
 import { Spinner } from '@/components/ui/spinner'
 import { useInsertSave } from './useInsertSave'
+import { ColumnDefaultValueInput } from './ColumnDefaultValueInput'
 
 interface InsertColumnModalProps {
   open: boolean
@@ -50,26 +53,31 @@ export function InsertColumnModal({
   const isEdit = mode === 'edit'
   const [createMore, setCreateMore] = useState(false)
   const [foreignKeyOpen, setForeignKeyOpen] = useState(false)
+  const [defaultValueOpen, setDefaultValueOpen] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Focus name input on open
   useEffect(() => {
     if (open) {
       setCreateMore(false)
+      setDefaultValueOpen(false)
       setTimeout(() => nameInputRef.current?.focus(), 150)
     }
   }, [open])
 
   const handleSave = useCallback(async () => {
-    if (foreignKeyOpen) return
+    if (foreignKeyOpen || defaultValueOpen) return
     if (!newColumnData.name.trim()) return
     const keepOpen = createMore && !isEdit
     await save(() => onInsert(keepOpen))
-  }, [createMore, foreignKeyOpen, isEdit, newColumnData.name, onInsert, save])
+  }, [createMore, defaultValueOpen, foreignKeyOpen, isEdit, newColumnData.name, onInsert, save])
 
   const handleParentOpenChange = (nextOpen: boolean) => {
     if (saving) return
-    if (!nextOpen) setForeignKeyOpen(false)
+    if (!nextOpen) {
+      setForeignKeyOpen(false)
+      setDefaultValueOpen(false)
+    }
     onOpenChange(nextOpen)
   }
 
@@ -77,6 +85,7 @@ export function InsertColumnModal({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (foreignKeyOpen || defaultValueOpen) return
         e.preventDefault()
         handleSave()
       }
@@ -85,7 +94,16 @@ export function InsertColumnModal({
       window.addEventListener('keydown', handleKeyDown)
     }
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open, handleSave])
+  }, [open, handleSave, foreignKeyOpen, defaultValueOpen])
+
+  const updateTypeOptions = (updates: { type?: string; isArray?: boolean }) => {
+    const current = {
+      ...newColumnData,
+      defaultValue: newColumnData.defaultValue ?? '',
+      isArray: !!newColumnData.isArray,
+    }
+    onNewColumnDataChange(applyColumnTypeChange(current, updates))
+  }
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={handleParentOpenChange}>
@@ -174,9 +192,7 @@ export function InsertColumnModal({
                   <label className="text-xs text-foreground block mb-1 font-medium">Type</label>
                   <Select
                     value={newColumnData.type}
-                    onValueChange={(val) =>
-                      onNewColumnDataChange({ ...newColumnData, type: val })
-                    }
+                    onValueChange={(val) => updateTypeOptions({ type: val })}
                   >
                     <SelectTrigger className="w-full bg-white dark:bg-surface-200 border-gray-300 dark:border-strong hover:bg-white dark:hover:bg-surface-300/60 focus:border-gray-400 dark:focus:border-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0">
                       <SelectValue placeholder="Select type..." />
@@ -203,16 +219,11 @@ export function InsertColumnModal({
 
                 <div>
                   <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      aria-label="Define as array"
                       checked={!!newColumnData.isArray}
-                      onChange={(e) =>
-                        onNewColumnDataChange({
-                          ...newColumnData,
-                          isArray: e.target.checked,
-                        })
-                      }
-                      className="rounded border-gray-300 dark:border-strong bg-white dark:bg-surface-200 text-brand focus:ring-2 focus:ring-gray-200 dark:focus:ring-0 cursor-pointer h-4 w-4 mt-0.5"
+                      onCheckedChange={(checked) => updateTypeOptions({ isArray: checked })}
+                      className="mt-0.5 h-[18px] w-[18px]"
                     />
                     <div>
                       <span className="text-xs font-medium text-foreground block">
@@ -227,15 +238,19 @@ export function InsertColumnModal({
 
                 <div>
                   <label className="text-xs text-foreground block mb-1 font-medium">
-                    Default Value
+                    Default value
                   </label>
-                  <input
-                    placeholder="NULL"
+                  <ColumnDefaultValueInput
+                    label="Default value"
+                    columnName={newColumnData.name}
                     value={newColumnData.defaultValue}
-                    onChange={(e) =>
-                      onNewColumnDataChange({ ...newColumnData, defaultValue: e.target.value })
-                    }
-                    className="w-full h-8 px-3 rounded-md bg-white dark:bg-surface-200 border border-gray-300 dark:border-strong text-foreground text-xs font-mono outline-none focus:border-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:border-brand dark:focus:ring-0"
+                    type={newColumnData.type}
+                    isArray={!!newColumnData.isArray}
+                    open={defaultValueOpen}
+                    onOpenChange={setDefaultValueOpen}
+                    onChange={(value) => onNewColumnDataChange({ ...newColumnData, defaultValue: value })}
+                    className="w-full"
+                    inputClassName="h-8 rounded-md"
                   />
                   <p className="text-[11px] text-foreground-lighter mt-1 leading-relaxed">
                     Can either be a literal or an expression. When using an expression wrap your
@@ -256,7 +271,10 @@ export function InsertColumnModal({
               <div className="col-span-8">
                 <button
                   type="button"
-                  onClick={() => setForeignKeyOpen(true)}
+                  onClick={() => {
+                    setDefaultValueOpen(false)
+                    setForeignKeyOpen(true)
+                  }}
                   className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-strong bg-white dark:bg-surface-200 hover:bg-gray-100 dark:hover:bg-surface-300 text-foreground text-xs font-medium transition-colors cursor-pointer"
                 >
                   {newColumnData.foreignKey ? 'Edit foreign key' : 'Add foreign key'}
@@ -403,7 +421,7 @@ export function InsertColumnModal({
               </button>
               <button
                 type="button"
-                disabled={saving || !newColumnData.name.trim()}
+                disabled={saving || !newColumnData.name.trim() || defaultValueOpen || foreignKeyOpen}
                 aria-busy={saving}
                 onClick={handleSave}
                 className="px-4 py-1.5 rounded-md bg-[#086E43] hover:bg-[#065836] border border-[#338161] text-white text-xs font-medium shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
